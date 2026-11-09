@@ -23,6 +23,7 @@ import { layers, stages } from "./content";
 import {
   defaultNetwork,
   hex,
+  linkedDemoHeaders,
   merkleRoot,
   sha256,
   signTransaction,
@@ -419,8 +420,10 @@ function HashLab() {
   const [text, setText] = useState(sample);
   const [hash, setHash] = useState("");
   const [parent, setParent] = useState("");
+  const [blockHash, setBlockHash] = useState("");
   const [root, setRoot] = useState("");
   const [baseline, setBaseline] = useState("");
+  const [error, setError] = useState("");
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -432,15 +435,21 @@ function HashLab() {
         "Lee pays Alex 4 ATLAS",
         "Maya pays Sam 3 ATLAS",
       ]),
-    ]).then(async ([h, b, r]) => {
-      const p = await sha256(`parent:${h}|block:285`);
-      if (!cancelled) {
-        setHash(h);
-        setBaseline(b);
-        setRoot(r);
-        setParent(p);
-      }
-    });
+    ])
+      .then(async ([h, b, r]) => {
+        const headers = await linkedDemoHeaders(r);
+        if (!cancelled) {
+          setHash(h);
+          setBaseline(b);
+          setRoot(r);
+          setBlockHash(headers.currentHash);
+          setParent(headers.nextHash);
+        }
+      })
+      .catch(() => {
+        if (!cancelled)
+          setError("Hashing needs a modern browser on HTTPS or localhost.");
+      });
     return () => {
       cancelled = true;
     };
@@ -507,17 +516,27 @@ function HashLab() {
             <code>{root || "Computing…"}</code>
           </div>
           <div>
-            <span>NEXT HEADER HASH · COMMITS TO THE PARENT</span>
-            <code>{parent || "Computing…"}</code>
+            <span>BLOCK #284 HEADER HASH · COMMITS TO THE MERKLE ROOT</span>
+            <code data-testid="block-hash">{blockHash || "Computing…"}</code>
+          </div>
+          <div>
+            <span>BLOCK #285 HEADER HASH · LINKS TO #284</span>
+            <code data-testid="next-block-hash">{parent || "Computing…"}</code>
           </div>
         </div>
       </div>
+      {error && (
+        <p className="notice error" role="alert">
+          {error}
+        </p>
+      )}
       <p className="method-note">
         Teaching conventions: UTF-8 strings, a binary Merkle tree that hashes
         concatenated hexadecimal children (duplicating the last for odd levels),
-        and a minimal header string. Real protocols specify their own encodings
-        and commitments. Changing data is detectable; consensus makes rewriting
-        accepted history costly.
+        and SHA-256 hashes of minimal JSON block headers. Block #285 references
+        the hash of #284, which commits to this Merkle root. Real protocols
+        specify their own encodings and commitments. Changing data is
+        detectable; consensus makes rewriting accepted history costly.
       </p>
     </section>
   );
@@ -543,7 +562,7 @@ export function Networks({ motion }: { motion: boolean }) {
       last = performance.now();
     let value = elapsed;
     const tick = (now: number) => {
-      value += (now - last) / 4;
+      value += Math.max(0, now - last) / 4;
       last = now;
       setElapsed(Math.min(value, duration));
       if (value >= duration) {

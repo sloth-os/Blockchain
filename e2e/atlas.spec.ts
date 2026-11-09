@@ -60,8 +60,12 @@ test("a signed transaction settles, rejects tampering, and recovers", async ({
   await page.getByRole("button", { name: "Wire bytes", exact: true }).click();
   await expect(page.getByTestId("payload")).toContainText("7b2266726f6d");
   const before = await page.getByTestId("transaction-hash").textContent();
+  const blockBefore = await page.getByTestId("block-hash").textContent();
+  const nextBefore = await page.getByTestId("next-block-hash").textContent();
   await page.getByRole("button", { name: "Change 2.5 to 2.6" }).click();
   await expect(page.getByTestId("transaction-hash")).not.toHaveText(before!);
+  await expect(page.getByTestId("block-hash")).not.toHaveText(blockBefore!);
+  await expect(page.getByTestId("next-block-hash")).not.toHaveText(nextBefore!);
 });
 
 test("network topology and failures change reachability", async ({ page }) => {

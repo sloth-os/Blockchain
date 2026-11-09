@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applications, layers, sources, topics } from "./content";
 import {
   defaultNetwork,
+  linkedDemoHeaders,
   merkleRoot,
   networkEdges,
   sha256,
@@ -114,6 +115,19 @@ describe("real demo cryptography", () => {
     expect(await merkleRoot(["a", "b", "d"])).not.toBe(root);
     expect(await merkleRoot(["b", "a", "c"])).not.toBe(root);
     expect(await merkleRoot([])).toBe(await sha256(""));
+  });
+  it("links block headers to their Merkle commitment and actual parent header hash", async () => {
+    const root = await merkleRoot(["original payment", "another payment"]);
+    const chain = await linkedDemoHeaders(root);
+    expect(chain.current.merkleRoot).toBe(root);
+    expect(chain.currentHash).toBe(await sha256(JSON.stringify(chain.current)));
+    expect(chain.next.previousHash).toBe(chain.currentHash);
+    expect(chain.nextHash).toBe(await sha256(JSON.stringify(chain.next)));
+    const changed = await linkedDemoHeaders(
+      await merkleRoot(["changed payment", "another payment"]),
+    );
+    expect(changed.currentHash).not.toBe(chain.currentHash);
+    expect(changed.nextHash).not.toBe(chain.nextHash);
   });
 });
 

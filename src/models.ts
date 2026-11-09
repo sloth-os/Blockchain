@@ -336,3 +336,26 @@ export async function merkleRoot(leaves: string[]): Promise<string> {
   }
   return level[0];
 }
+
+/** Minimal JSON headers: commit to the transaction tree, then link the next block. */
+export async function linkedDemoHeaders(root: string) {
+  const current = {
+    height: 284,
+    previousHash: await sha256("fixed educational header #283"),
+    merkleRoot: root,
+  };
+  const currentHash = await sha256(JSON.stringify(current));
+  const next = {
+    height: 285,
+    previousHash: currentHash,
+    merkleRoot: await merkleRoot([
+      "fixed educational transaction in block #285",
+    ]),
+  };
+  return {
+    current,
+    currentHash,
+    next,
+    nextHash: await sha256(JSON.stringify(next)),
+  };
+}
