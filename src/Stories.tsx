@@ -45,12 +45,10 @@ export function Applications({
   useEffect(() => setStep(0), [app.id]);
   const choose = (id: string) => {
     navigate("applications", id);
-    document
-      .getElementById("application-detail")
-      ?.scrollIntoView({
-        behavior: motion ? "smooth" : "instant",
-        block: "start",
-      });
+    document.getElementById("application-detail")?.scrollIntoView({
+      behavior: motion ? "smooth" : "instant",
+      block: "start",
+    });
   };
   return (
     <div className="page">
