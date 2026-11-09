@@ -6,28 +6,29 @@ Explore the website at **https://sloth-os.github.io/Blockchain/**.
 
 Chain Atlas connects a visual peer network to actual browser cryptography, network experiments, system design trade-offs, real applications and a sourced research agenda. It is a static website: no account, wallet, API key, backend or real funds are required.
 
-## Explore
+## One immersive world
 
-| Chapter             | What you can do                                                                                                                                                                                                                                                             |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Overview**        | Enter Protocol Theater: scrub a seven-phase transaction, follow the guided camera, inspect 24 semantic 3D objects and their real local cryptographic data, switch Data/Messages/Trust lenses, or expand into immersive mode.                                                |
-| **Transaction lab** | Follow compose → sign → broadcast → validate → build → agree → settle. Inspect UTF-8 wire bytes, hashes and an actual Ed25519 signature. Tamper with the signed amount and see verification reject it. Edit a transaction to change its SHA-256 hash and Merkle commitment. |
-| **Network lab**     | Change mesh/ring/hub topology, node count, latency, bandwidth, payload size and offline percentage. Broadcast a message, inspect each peer’s first relay and arrival time, and compare reachability, p50/p95 and modeled traffic.                                           |
-| **The trade-offs**  | Compare Bitcoin, Ethereum, optimistic rollups, ZK rollups, Solana and Lightning under the same adjustable teaching workload. Inspect settlement, fees, security assumptions and bottlenecks, then explore six levels of system design.                                      |
-| **Real world**      | Explore ten mechanisms and their human/economic boundaries: Bitcoin, USDC, Uniswap, Aave, NFTs/ERC-721, ENS/Web3, Chainlink, BlackRock BUIDL, Helium and WFP Building Blocks. Filter by category and step through each value flow.                                          |
-| **Hot topics**      | Explore ten animated issue explainers: rollup fragmentation, stablecoins, asset tokenization, MEV, bridges, data availability, account abstraction, privacy, post-quantum security and physical infrastructure. Each links to primary sources.                              |
+The website opens directly into a full-screen 3D workspace. There are no separate lab pages or immersive-mode toggle. Five connected areas coexist in the same scene:
 
-Global search (`Ctrl/Cmd + K`) covers chapters, glossary concepts, applications and issues. URL hash routes support direct links and browser back/forward navigation under a GitHub Pages project path.
+| In-world area                 | What you can explore                                                                                                                                                                                                                                           |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Transaction anatomy**       | Compose → sign → broadcast → validate → build → agree → settle. Inspect real local Ed25519 signatures, UTF-8 bytes, SHA-256 hashes, four-leaf Merkle commitments and a linked block header. Alter the signed amount to fail authorization.                     |
+| **Peer network**              | The transaction travels through this actual adjustable graph. Change mesh/ring/hub topology, node count, latency, bandwidth, message size and failures. Broadcast and inspect first-arrival routes, p50/p95, reachability and modeled wire data.               |
+| **Scaling & trade-offs**      | Two physical lanes compare Bitcoin, Ethereum, optimistic/ZK rollups, Solana and Lightning under a shared workload. Explore saturation, backlogs, settlement, fees, trust and six system-design layers. Message size is shared with the propagation experiment. |
+| **Real-world connections**    | Ten applications: Bitcoin, USDC, Uniswap, Aave, NFTs/ERC-721, ENS/Web3, Chainlink, BlackRock BUIDL, Helium and WFP Building Blocks. Follow participants, messages, value and institutional boundaries in the world.                                            |
+| **Questions at the frontier** | Ten sourced mechanisms: rollup fragmentation, stablecoins, asset tokenization, MEV, bridges, availability, account abstraction, privacy, post-quantum security and physical infrastructure. Each application connects to a relevant open question.             |
+
+Use **Atlas** to pull back and select a glowing landmark, select objects directly, or follow the connected learning path below the scene. Moving between areas preserves the transaction draft, experiments, selections and playback positions. The same canvas and WebGL context stay mounted, including when the peer graph or application changes.
+
+**Experiment** opens controls beside the selected process (a bottom sheet on mobile). **Explain** opens the underlying requirements, formulas and primary sources. Selecting an object opens its facts, exact data and trust assumptions in that same workbench. **Objects** provides a keyboard-accessible alternative to selecting objects in 3D. All 23 primary sources are available through the header book icon.
 
 ## Immersive controls
 
-The landing page is a 42-second **Protocol Theater**. Play/pause, replay, change speed, scrub the timeline, or select a phase. Follow the transaction with the camera, inspect the complete protocol map, or switch to an overhead view. **Go immersive** fills the viewport; Escape returns you to the page and restores keyboard focus.
+Play/pause, restart, change speed or scrub the seven-phase transaction timeline. Application and issue mechanisms have four selectable phases. **Follow**, **Frame** and **Above** change the camera; **Data**, **Messages** and **Trust** change the information lens. The signature exercise blocks later phases after tampering and allows recovery by restoring the signed bytes.
 
-Every visual object represents a participant, data structure, or verification boundary. Select an object directly or use **Objects** to inspect exact payload bytes, full signatures and public keys, complete Merkle hashes, the block commitment, remaining trust assumptions, and a primary source. Data, Messages and Trust lenses change which information is emphasized. Alter the signed amount to make real local verification fail and block later phases; restore the payload to continue.
+Drag to orbit, pinch with two fingers to zoom, or focus the canvas and use arrow keys, `+`/`−`, Enter and Home. Search (`Ctrl/Cmd + K`) focuses a concept, application or question within the world. Escape closes a workbench or native dialog while retaining the immersive workspace. Previous hash links still open the corresponding focus; internal exploration does not navigate between pages.
 
-Drag to orbit, use two fingers to pinch-zoom on touch screens, use arrow keys to orbit, `+`/`−` to zoom, Enter to inspect the next object, and Home or the reset button to restore the camera. Reduced motion disables automatic playback and continuous movement while preserving manual exploration. Playback pauses when the theater is off-screen or the document is hidden.
-
-Application and hot-topic scenes use domain-specific actors and distinguish data messages, cryptographic proofs, votes and value movements. The transaction scene shows four Merkle leaves, two intermediate commitments and the root, all computed from the actual local payload. Network labels distinguish predicted, waiting, received, offline and unreachable states. Comparison objects show the same demand, resource ceiling and completed calls as the adjustable model.
+Reduced motion disables automatic playback and continuous movement while retaining manual controls. Motion can be toggled globally and pauses while a dialog is open or the document is hidden. The scene accommodates open controls, and labels avoid the introduction and workbench. Without WebGL, semantic objects and all educational controls remain available in a scrollable compatibility view.
 
 ## Develop
 
@@ -62,11 +63,11 @@ Use the existing checkout in isolated cloud tasks. A separate Git worktree is un
 
 The [GitHub Pages workflow](.github/workflows/pages.yml) runs on pushes to `main`, pull requests targeting `main`, and manual dispatch. It installs from `package-lock.json`, runs unit tests, builds/type-checks, runs Chromium tests against the production output, and uploads/deploys `dist/`. Pull requests validate without deploying. Actions are pinned to their verified commit SHAs; build permissions are read-only, and only the deployment job gets Pages/OIDC write permissions.
 
-In repository **Settings → Pages**, select **GitHub Actions** as the source. Push to `main` or dispatch the workflow. The site uses relative asset paths and hash routing, so it works at `/Blockchain/` without rewrite rules or a custom server. For a different repository, update the public links in `README.md` and `src/App.tsx`.
+In repository **Settings → Pages**, select **GitHub Actions** as the source. Push to `main` or dispatch the workflow. The site uses relative asset paths and backward-compatible hash links, so it works at `/Blockchain/` without rewrite rules or a custom server. For a different repository, update the public links in `README.md` and `src/Workspace.tsx`.
 
 ## Research and interpretation
 
-See [research notes and sources](docs/RESEARCH.md) for provenance, the editorial selection method and protocol-specific caveats. The site also includes a source library in its footer and contextual links in each chapter.
+See [research notes and sources](docs/RESEARCH.md) for provenance, the editorial selection method and protocol-specific caveats. The header opens the source library, and each process includes contextual citations.
 
 **Models are not network benchmarks.** Throughput bars disclose fixed, illustrative resource budgets. Network propagation is deterministic and omits congestion, transport overhead and adversarial behavior. Ethereum inclusion, checkpoint finality, rollup settlement and canonical withdrawal delays are treated separately. The hot-topic sequence is an editorial learning agenda, not a live or measured popularity ranking.
 
@@ -74,14 +75,15 @@ The signing lab uses real browser-native **Ed25519 signatures and SHA-256**, but
 
 ## Architecture and accessibility
 
-- **React + TypeScript + Vite** for the static app; **Three.js** for 3D scenes; **Lucide** for icons. Fonts are bundled locally.
+- **React + TypeScript + Vite** for the static app; **Three.js** for the persistent 3D world; **Lucide** for icons. Fonts are bundled locally.
 - `src/content.ts`: applications, transaction stages, issue research, glossary and source registry.
 - `src/models.ts`: deterministic propagation, comparative workload math, hashing, Merkle commitments, signing and verification.
 - `src/spatial.ts`: typed semantic scene graphs, actor explanations, trust assumptions, source links and causally ordered message windows for the protocol, every application and every issue.
-- `src/Experience.tsx`: protocol playback, scrubbing, information lenses, camera modes, real local cryptography and accessible immersive mode.
+- `src/atlas.ts`: one namespaced world graph, shared transaction-to-peer routing, landmarks, spatial connections and legacy-link interpretation.
+- `src/useAtlas.ts`: persistent experiment state, linked controls, cryptography, playback and camera focus.
+- `src/Workspace.tsx`: the full-screen workspace, contextual workbench, connected timeline, search and source library.
 - `src/Scene.tsx`: Three.js object geometry, projected DOM annotations with collision-aware placement and leader lines, raycasting, camera easing, inertial orbit, touch pinch, object inspection and semantic 2D fallback. Rendering targets at most 30 FPS, stops off-screen/hidden work, and renders paused scenes only when needed. Live data and timeline changes reuse the existing renderer; geometry, materials, textures, observers and GPU contexts are cleaned up on unmount.
-- `src/Labs.tsx` and `src/Stories.tsx`: explorable chapters; `src/App.tsx` handles routing, search and the source dialog.
-- `src/models.test.ts`, `src/spatial.test.ts` and `e2e/atlas.spec.ts`: meaningful unit and production-browser checks.
+- `src/models.test.ts`, `src/spatial.test.ts`, `src/atlas.test.ts` and `e2e/atlas.spec.ts`: meaningful unit and production-browser checks.
 
 Responsive layouts support mobile and desktop. Motion respects the initial system preference and can be toggled globally. Canvas controls support arrow keys, `+`/`−`, and `Enter` to select peers; the network inspector also exposes every peer as a standard button. Native dialogs support Escape and focus containment. A 2D fallback and all textual explanations remain available without WebGL. No analytics, wallet connection or runtime third-party fonts are included.
 

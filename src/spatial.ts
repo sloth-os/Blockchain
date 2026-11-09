@@ -44,6 +44,11 @@ export interface SpatialObject {
   offline?: boolean;
   arrival?: number;
   fill?: number;
+  area?: string;
+  localId?: string;
+  portal?: boolean;
+  networkIndex?: number;
+  sourceId?: string;
 }
 export interface SpatialFlow {
   from: string;
@@ -54,6 +59,10 @@ export interface SpatialFlow {
   arc?: number;
   window?: [number, number];
   rate?: number;
+  area?: string;
+  networkEdge?: [number, number];
+  relation?: boolean;
+  trace?: boolean;
 }
 export interface SpatialChapter {
   title: string;

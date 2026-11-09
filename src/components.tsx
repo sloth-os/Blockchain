@@ -20,84 +20,6 @@ export function SourceLink({ id }: { id: string }) {
     </a>
   );
 }
-export function Eyebrow({ children }: { children: ReactNode }) {
-  return <div className="eyebrow">{children}</div>;
-}
-export function PageHeading({
-  chapter,
-  title,
-  accent,
-  description,
-  children,
-}: {
-  chapter: string;
-  title: string;
-  accent?: string;
-  description: string;
-  children?: ReactNode;
-}) {
-  return (
-    <header className="page-heading">
-      <div>
-        <Eyebrow>
-          <span className="tiny-square" />
-          {chapter}
-        </Eyebrow>
-        <h1>
-          {title}
-          {accent && (
-            <>
-              <br />
-              <span>{accent}</span>
-            </>
-          )}
-        </h1>
-        <p>{description}</p>
-      </div>
-      {children}
-    </header>
-  );
-}
-export function PanelHeader({
-  number,
-  title,
-  children,
-}: {
-  number?: string;
-  title: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="panel-header">
-      <div className="panel-label">
-        {number && <span>{number} /</span>}
-        {title}
-      </div>
-      <div className="panel-actions">{children}</div>
-    </div>
-  );
-}
-export function Stat({
-  value,
-  label,
-  unit,
-  color,
-}: {
-  value: ReactNode;
-  label: string;
-  unit?: string;
-  color?: string;
-}) {
-  return (
-    <div className="stat">
-      <div className="stat-number" style={color ? { color } : undefined}>
-        {value}
-        {unit && <span>{unit}</span>}
-      </div>
-      <div className="stat-label">{label}</div>
-    </div>
-  );
-}
 export function Range({
   label,
   value,
@@ -177,40 +99,5 @@ export function Dialog({
       </div>
       {children}
     </dialog>
-  );
-}
-export function StepList({ steps }: { steps: [string, string][] }) {
-  return (
-    <ol className="flow-steps">
-      {steps.map(([title, text], i) => (
-        <li key={title}>
-          <span className="step-number">{String(i + 1).padStart(2, "0")}</span>
-          <div>
-            <h4>{title}</h4>
-            <p>{text}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-export function Tag({
-  children,
-  color,
-}: {
-  children: ReactNode;
-  color?: string;
-}) {
-  return (
-    <span
-      className="tag"
-      style={
-        color
-          ? { color, borderColor: `${color}35`, background: `${color}0a` }
-          : undefined
-      }
-    >
-      {children}
-    </span>
   );
 }

@@ -85,7 +85,7 @@ link time = latency × [1 + ((a × 7 + b × 3) mod 9) / 30]
             + payload bits / bandwidth
 ```
 
-Percentiles include the source at time zero and only reachable nodes. Reachability is reported independently so a disconnected graph cannot appear healthy because it has a small percentile. Traffic counts one payload in each direction over each edge reachable from the source. The animation runs at one quarter model speed. Transport overhead, queues, packet loss, hash announcements, compact blocks, retransmission, adversarial peers and real gossip fanout are excluded.
+Percentiles include the source at time zero and only reachable nodes. Reachability is reported independently so a disconnected graph cannot appear healthy because it has a small percentile. Traffic counts one payload in each direction over each edge reachable from the source. At 1× playback the animation runs at one quarter model speed; the speed control scales this presentation. Reduced motion completes a requested broadcast immediately. Transport overhead, queues, packet loss, hash announcements, compact blocks, retransmission, adversarial peers and real gossip fanout are excluded.
 
 ### Cryptographic exercise
 
@@ -95,12 +95,12 @@ The demo does not implement real balances, consensus, a replay-protected network
 
 ### Spatial narratives and motion
 
-The seven-phase Protocol Theater uses an editorial 42-second timeline. Its elapsed seconds are **narration time**, not a measured blockchain’s confirmation or finality time. The scene shows five relay actors for legibility; its separate propagation readout references the documented 18-node teaching model. Only the network lab's reported milliseconds follow the deterministic link model.
+The seven-phase transaction uses an editorial 42-second timeline. Its elapsed seconds are **narration time**, not a measured blockchain’s confirmation or finality time. The broadcast phase routes through the same adjustable peer graph used by the propagation experiment, with the same topology, failed nodes, message-size budget and modeled arrivals. The graph defaults to 18 peers; there is no separate miniature relay network. Only the displayed model milliseconds follow the deterministic link calculation.
 
 Protocol message paths have explicit causal windows: submission precedes relay, relay precedes forwarding, child hashes precede parent commitments, the root precedes the header commitment, and proposals precede returning votes. Full local signatures, public keys, transaction hashes, all four Merkle leaves, both intermediate hashes, the root and the header hash are inspectable. Cryptography is computed locally when the draft is prepared; animation explains the relationship between those results rather than timing the computation.
 
 The semantic scene model distinguishes data, value, proof and vote paths. For example, an oracle report is not a transfer of money; a redemption request and a redemption settlement have different directions. Application arrows represent conceptual participants and processing stages rather than complete production message protocols. Domain-specific trust boundaries remain linked to primary sources.
 
-Application/issue message motions repeat while a phase is viewed. Comparison motion is normalized to offered load to emphasize a bottleneck; particle velocities, geometric sizes and decorative pulses are not empirical latency or throughput measurements. Predicted peer arrival is explicitly distinguished from receipt; offline and disconnected peers never claim to have received a message.
+Application/issue message motions repeat while their process is playing; manual phase selection pauses playback. All five learning areas and both comparison lanes coexist in one world. Camera focus changes the active explanation, while the transaction and experiment settings persist. Dashed cross-area connections are learning relationships, not simulated protocol messages. Comparison motion is normalized to offered load to emphasize a bottleneck; particle velocities, geometric sizes and decorative pulses are not empirical latency or throughput measurements. Predicted peer arrival is explicitly distinguished from receipt; offline and disconnected peers never claim to have received a message.
 
 The three validator glyphs are an equal-weight schematic. Ethereum uses stake-weighted checkpoint votes, Bitcoin uses accumulated proof of work, and neither is implemented as real consensus here. Fast display motion does not imply instant settlement, a guaranteed peg, legal ownership or off-chain delivery.

@@ -39,6 +39,14 @@ interface Props {
   inspector?: boolean;
   blocked?: boolean;
   onObjectSelect?: (actor: SpatialObject) => void;
+  focusArea?: string;
+  selectedObjectId?: string | null;
+  cameraFrame?: { target: Point3; distance: number; fit?: number };
+  safeInsets?: {
+    right: number;
+    bottom: number;
+    intro?: { width: number; height: number };
+  };
 }
 const vec = (p: Point3) => new THREE.Vector3(...p);
 const clamp = (n: number, min: number, max: number) =>
@@ -70,6 +78,10 @@ export default function Scene({
   inspector = true,
   blocked = false,
   onObjectSelect,
+  focusArea,
+  selectedObjectId,
+  cameraFrame,
+  safeInsets,
 }: Props) {
   const generated = useMemo(
     () =>
@@ -91,8 +103,21 @@ export default function Scene({
   const labels = useRef(new Map<string, HTMLButtonElement>());
   const flowLabels = useRef(new Map<number, HTMLSpanElement>());
   const dirty = useRef(true);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const pose = useRef<{
+    position: THREE.Vector3;
+    target: THREE.Vector3;
+    azimuth: number;
+    polar: number;
+    zoom: number;
+    userOrbit: boolean;
+  } | null>(null);
   const selectedId =
-    story.network && selected !== null ? `n${selected}` : picked;
+    selectedObjectId !== undefined
+      ? selectedObjectId
+      : story.network && selected !== null
+        ? `n${selected}`
+        : picked;
   const selectedObject = story.objects.find((o) => o.id === selectedId);
   const [localView, setLocalView] = useState<CameraMode>("map");
   const view = cameraMode ?? localView;
@@ -106,6 +131,9 @@ export default function Scene({
   };
   const motionAllowed = motion ?? playing;
   const latest = useRef({
+    focusArea,
+    cameraFrame,
+    safeInsets,
     motionAllowed,
     story,
     step,
@@ -126,6 +154,9 @@ export default function Scene({
   });
   useEffect(() => {
     latest.current = {
+      focusArea,
+      cameraFrame,
+      safeInsets,
       motionAllowed,
       story,
       step,
@@ -168,11 +199,14 @@ export default function Scene({
     if (!host) return;
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-        powerPreference: "low-power",
-      });
+      renderer =
+        rendererRef.current ??
+        new THREE.WebGLRenderer({
+          antialias: true,
+          alpha: true,
+          powerPreference: "low-power",
+        });
+      rendererRef.current = renderer;
     } catch {
       setFallback(true);
       return;
@@ -184,7 +218,7 @@ export default function Scene({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35;
     const canvas = renderer.domElement;
-    host.appendChild(canvas);
+    if (canvas.parentElement !== host) host.appendChild(canvas);
     canvas.tabIndex = 0;
     canvas.setAttribute("role", "img");
     canvas.setAttribute(
@@ -195,7 +229,7 @@ export default function Scene({
     scene.fog = new THREE.FogExp2("#09131a", 0.022);
     const world = new THREE.Group();
     scene.add(world);
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 150);
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 350);
     const target = new THREE.Vector3(0, 0.5, 0),
       desiredTarget = target.clone();
     let azimuth = 0.16,
@@ -204,6 +238,14 @@ export default function Scene({
       userOrbit = false,
       dragging = false,
       inView = true;
+    if (pose.current) {
+      camera.position.copy(pose.current.position);
+      target.copy(pose.current.target);
+      azimuth = pose.current.azimuth;
+      polar = pose.current.polar;
+      zoom = pose.current.zoom;
+      userOrbit = pose.current.userOrbit;
+    }
     let width = 1,
       height = 1,
       time = 0,
@@ -471,7 +513,11 @@ export default function Scene({
         );
         torso.position.y = -0.1;
       } else if (actor.kind === "shard") {
-        for (let i = 0; i < (actor.id.startsWith("leaf") ? 1 : 9); i++) {
+        for (
+          let i = 0;
+          i < ((actor.localId ?? actor.id).startsWith("leaf") ? 1 : 9);
+          i++
+        ) {
           const cell = body(
             glyph,
             new THREE.BoxGeometry(0.16, 0.07, 0.16),
@@ -549,6 +595,10 @@ export default function Scene({
       cells.forEach((cell) => {
         cell.userData.baseY = cell.position.y;
       });
+      if (actor.portal)
+        materials.forEach((material) => {
+          material.fog = false;
+        });
       actorGroups.set(actor.id, {
         group,
         glyph,
@@ -695,6 +745,8 @@ export default function Scene({
     );
     intersection.observe(host);
     const cameraDestination = new THREE.Vector3();
+    let viewRight = 0,
+      viewBottom = 0;
     const setCamera = (dt: number, snap = false) => {
       const current = latest.current;
       const chapter =
@@ -703,10 +755,12 @@ export default function Scene({
         ];
       const pickedActor =
         current.selectedId && actorGroups.get(current.selectedId);
-      if (current.view === "follow" && !current.story.network) {
+      if (current.cameraFrame)
+        desiredTarget.copy(vec(current.cameraFrame.target));
+      else if (current.view === "follow" && !current.story.network) {
         desiredTarget.copy(pickedActor ? pickedActor.base : vec(chapter.focus));
       } else desiredTarget.copy(mapCenter);
-      const distance =
+      const defaultDistance =
         (current.view === "follow" && !current.story.network
           ? pickedActor
             ? 6.6
@@ -721,6 +775,30 @@ export default function Scene({
               1,
               (current.story.id === "protocol" ? 1.5 : 0.82) / camera.aspect,
             ));
+      const logicalAspect = Math.max(
+        0.3,
+        (width - (current.safeInsets?.right ?? 0)) /
+          (height - (current.safeInsets?.bottom ?? 0)),
+      );
+      const distance = current.cameraFrame
+        ? current.cameraFrame.distance *
+          zoom *
+          Math.max(1, (current.cameraFrame.fit ?? 0.9) / logicalAspect)
+        : defaultDistance;
+      const projectionBlend =
+        !current.motionAllowed || snap ? 1 : 1 - Math.exp(-dt * 7);
+      viewRight +=
+        ((current.safeInsets?.right ?? 0) - viewRight) * projectionBlend;
+      viewBottom +=
+        ((current.safeInsets?.bottom ?? 0) - viewBottom) * projectionBlend;
+      camera.setViewOffset(
+        width,
+        height,
+        viewRight * 0.5,
+        viewBottom * 0.5,
+        width,
+        height,
+      );
       const phi = current.view === "top" ? 0.12 : polar;
       cameraDestination
         .set(
@@ -735,11 +813,13 @@ export default function Scene({
       camera.position.lerp(cameraDestination, blend);
       camera.lookAt(target);
       return (
+        Math.abs((current.safeInsets?.right ?? 0) - viewRight) > 0.3 ||
+        Math.abs((current.safeInsets?.bottom ?? 0) - viewBottom) > 0.3 ||
         camera.position.distanceToSquared(cameraDestination) > 0.0001 ||
         target.distanceToSquared(desiredTarget) > 0.0001
       );
     };
-    setCamera(0.016, true);
+    setCamera(0.016, !pose.current);
     let px = 0,
       py = 0,
       travel = 0,
@@ -889,6 +969,7 @@ export default function Scene({
     canvas.addEventListener("webglcontextlost", contextLost);
     let previousStep = step,
       previousReset = resetKey;
+    let previousFocus = focusArea;
     let phaseTime = 0;
     const projected = new THREE.Vector3();
     const occupied: { x: number; y: number; w: number; h: number }[] = [];
@@ -906,19 +987,28 @@ export default function Scene({
       const rank = (actor: SpatialObject) =>
         actor.id === current.selectedId
           ? -1000
-          : actor.step === current.step
-            ? -100 -
-              (important.includes(actor.id)
-                ? 20 - important.indexOf(actor.id)
-                : 0)
-            : actor.secondary
-              ? 10
-              : 0;
+          : actor.portal && current.focusArea === "atlas"
+            ? -900
+            : actor.step === current.step
+              ? -100 -
+                (important.includes(actor.localId ?? actor.id)
+                  ? 20 - important.indexOf(actor.localId ?? actor.id)
+                  : 0)
+              : actor.secondary
+                ? 10
+                : 0;
       const ranked = [...current.story.objects].sort(
         (a, b) => rank(a) - rank(b),
       );
       let shown = 0;
-      const maxLabels = current.compact ? 3 : width < 500 ? 5 : 10;
+      const maxLabels =
+        current.focusArea === "atlas"
+          ? 5
+          : current.compact
+            ? 3
+            : width < 500
+              ? 5
+              : 10;
       for (const actor of ranked) {
         const el = labels.current.get(actor.id),
           node = actorGroups.get(actor.id);
@@ -930,8 +1020,8 @@ export default function Scene({
           .project(camera);
         const x = (projected.x * 0.5 + 0.5) * width,
           y = (-projected.y * 0.5 + 0.5) * height;
-        const w = current.compact ? 110 : width < 500 ? 119 : 166,
-          h = current.compact ? 37 : 49;
+        const w = el.offsetWidth || (current.compact ? 110 : 166),
+          h = el.offsetHeight || (current.compact ? 37 : 49);
         const offsets = current.compact
           ? [
               [0, 0],
@@ -946,17 +1036,48 @@ export default function Scene({
               [-65, 35],
               [65, 35],
               [0, 65],
+              ...(actor.portal
+                ? [
+                    [0, 110],
+                    [-80, 110],
+                    [80, 110],
+                    [0, 165],
+                  ]
+                : []),
             ];
         const reservedBottom =
           current.story.id === "protocol" ? 85 : current.compact ? 25 : 38;
+        // Small screens retain five anchored landmarks in readable rows.
+        // Leader lines still connect each label to its world-space object.
+        if (actor.portal && current.focusArea === "atlas" && width < 700) {
+          const layout: Record<string, [number, number]> = {
+            transaction: [0.5, 2],
+            network: [0.25, 1],
+            scale: [0.75, 1],
+            applications: [0.75, 0],
+            topics: [0.25, 0],
+          };
+          const [column, row] = layout[actor.area ?? "transaction"];
+          const top = current.safeInsets?.intro?.height ?? 150;
+          const spacing = clamp((height - top - 165) / 3, 55, 85);
+          offsets.unshift([
+            width * column - x,
+            top + h + 18 + row * spacing - y,
+          ]);
+        }
         const candidate = offsets
           .map(([dx, dy]) => ({ x: x + dx, y: y + dy, dx, dy }))
           .find((p) => {
             if (
               p.x < w / 2 + 7 ||
-              p.x > width - w / 2 - 7 ||
+              p.x > width - (current.safeInsets?.right ?? 0) - w / 2 - 7 ||
               p.y - h < 58 ||
-              p.y > height - reservedBottom
+              (current.safeInsets?.intro &&
+                p.x - w / 2 < current.safeInsets.intro.width &&
+                p.y - h < current.safeInsets.intro.height) ||
+              p.y >
+                height -
+                  Math.max(reservedBottom, current.safeInsets?.bottom ?? 0)
             )
               return false;
             return !occupied.some(
@@ -967,15 +1088,34 @@ export default function Scene({
           });
         const hidden =
           !current.showLabels ||
+          (current.focusArea
+            ? current.focusArea === "atlas"
+              ? !actor.portal
+              : actor.portal ||
+                (actor.area !== current.focusArea &&
+                  !(
+                    current.focusArea === "transaction" &&
+                    current.step === 2 &&
+                    actor.area === "network"
+                  ))
+            : false) ||
           projected.z > 1 ||
           projected.z < 0 ||
           !candidate ||
           (!chosen &&
             (shown >= maxLabels ||
-              (actor.secondary && !current.story.network) ||
+              (actor.secondary &&
+                !current.story.network &&
+                actor.area !== "network") ||
               (current.view === "follow" &&
                 !current.story.network &&
-                Math.abs(actor.step - current.step) > 1)));
+                Math.abs(actor.step - current.step) > 1 &&
+                !actor.portal &&
+                !(
+                  current.focusArea === "transaction" &&
+                  current.step === 2 &&
+                  actor.area === "network"
+                ))));
         const placed = candidate ?? { x, y, dx: 0, dy: 0 };
         el.style.visibility = hidden ? "hidden" : "visible";
         el.style.transform = `translate3d(${placed.x}px,${placed.y}px,0) translate(-50%,-100%)`;
@@ -1015,8 +1155,16 @@ export default function Scene({
           !current.showLabels ||
           current.lens === "trust" ||
           current.compact ||
-          (current.lens !== "flow" && current.story.network) ||
-          flow.step !== current.step ||
+          (current.lens !== "flow" &&
+            (current.story.network || flow.networkEdge)) ||
+          (!(
+            flow.trace &&
+            current.focusArea === "transaction" &&
+            current.step === 2
+          ) &&
+            (flow.step !== current.step ||
+              (current.focusArea && flow.area !== current.focusArea))) ||
+          flow.relation ||
           overlap ||
           x < 75 ||
           x > width - 75 ||
@@ -1037,6 +1185,11 @@ export default function Scene({
       const current = latest.current;
       const active = current.playing && inView && !document.hidden;
       if (!inView || document.hidden) return;
+      if (current.focusArea !== previousFocus) {
+        previousFocus = current.focusArea;
+        phaseTime = 0;
+        dirty.current = true;
+      }
       if (current.step !== previousStep) {
         previousStep = current.step;
         phaseTime = 0;
@@ -1072,25 +1225,42 @@ export default function Scene({
         phaseTime += dt * current.speed;
       }
       gridMaterial.uniforms.uTime.value = time;
+      gridMaterial.uniforms.uColor.value.set(current.story.color);
       stars.rotation.y = Math.sin(time * 0.025) * 0.015;
       for (const actor of current.story.objects) {
         const item = actorGroups.get(actor.id);
         if (!item) continue;
-        const index = current.story.network ? Number(actor.id.slice(1)) : -1;
-        const isOffline = current.story.network
+        const index =
+          actor.networkIndex ??
+          (current.story.network ? Number(actor.id.slice(1)) : -1);
+        const isPeer = index >= 0;
+        const sameArea =
+          !current.focusArea ||
+          actor.area === current.focusArea ||
+          (current.focusArea === "transaction" && current.step === 2 && isPeer);
+        const isOffline = isPeer
           ? (current.offline?.has(index) ?? actor.offline)
           : actor.offline;
         const arrival = current.arrivals?.[index] ?? actor.arrival ?? 0;
         const reached =
-          !current.story.network ||
+          !isPeer ||
           current.progress === undefined ||
           arrival <= current.progress;
-        const isActive = actor.step === current.step,
+        const isActive = actor.portal
+            ? current.focusArea === "atlas"
+            : sameArea &&
+              (actor.step === current.step ||
+                (current.focusArea === "transaction" &&
+                  current.step === 2 &&
+                  isPeer)),
           chosen = actor.id === current.selectedId || actor.id === hover;
-        const isBlocked = current.blocked && actor.step > 3;
+        const isBlocked =
+          current.blocked &&
+          (!actor.area || actor.area === "transaction") &&
+          actor.step > 3;
         const tint = isOffline
           ? "#47525d"
-          : current.blocked && actor.id === "verify"
+          : current.blocked && (actor.localId ?? actor.id) === "verify"
             ? "#f59291"
             : (actor.color ?? current.story.color);
         item.group.position.copy(item.base);
@@ -1119,7 +1289,13 @@ export default function Scene({
                   : 0.08;
           m.opacity =
             (m.userData.baseOpacity ?? 1) *
-            (isOffline || isBlocked ? 0.2 : isActive || chosen ? 0.96 : 0.45);
+            (isOffline || isBlocked
+              ? 0.2
+              : isActive || chosen
+                ? 0.96
+                : sameArea
+                  ? 0.45
+                  : 0.16);
         });
         item.glyph.traverse((child) => {
           if (child instanceof THREE.Sprite) {
@@ -1160,7 +1336,17 @@ export default function Scene({
       paths.forEach((path) => {
         const flow = current.story.flows[path.index];
         const activeFlow =
-          flow.step === current.step && !(current.blocked && flow.step > 3);
+          ((flow.step === current.step &&
+            (!current.focusArea || flow.area === current.focusArea)) ||
+            (!!flow.trace &&
+              current.focusArea === "transaction" &&
+              current.step === 2)) &&
+          !flow.relation &&
+          !(
+            current.blocked &&
+            (!flow.area || flow.area === "transaction") &&
+            flow.step > 3
+          );
         const a = actorGroups.get(flow.from),
           b = actorGroups.get(flow.to);
         if (!a || !b) return;
@@ -1172,14 +1358,20 @@ export default function Scene({
           amount = clamp((amount - from) / (to - from), 0, 1);
         }
 
-        const aIndex = Number(flow.from.slice(1)),
-          bIndex = Number(flow.to.slice(1));
-        if (current.story.network && current.progress !== undefined) {
+        const [aIndex, bIndex] = flow.networkEdge ?? [
+          Number(flow.from.slice(1)),
+          Number(flow.to.slice(1)),
+        ];
+        if (
+          (flow.networkEdge || current.story.network) &&
+          current.progress !== undefined
+        ) {
           const at = current.arrivals?.[aIndex] ?? 0,
             bt = current.arrivals?.[bIndex] ?? 0;
           const first = Math.min(at, bt),
             end = Math.max(at, bt);
           visible =
+            activeFlow &&
             Number.isFinite(end) &&
             end > first &&
             current.progress >= first &&
@@ -1195,7 +1387,7 @@ export default function Scene({
         }
         const material = path.line.material as THREE.LineDashedMaterial;
         const failedEdge =
-          current.story.network &&
+          (flow.networkEdge || current.story.network) &&
           (current.offline?.has(aIndex) || current.offline?.has(bIndex));
         material.opacity = failedEdge
           ? 0.035
@@ -1208,7 +1400,10 @@ export default function Scene({
               : current.view === "map"
                 ? 0.14
                 : 0.05;
-        if (current.blocked && flow.to === "verify")
+        if (
+          current.blocked &&
+          (flow.to === "verify" || flow.to === "tx:verify")
+        )
           material.color.set("#f59291");
         path.packets.forEach((packet, i) => {
           const t = amount - i * 0.033;
@@ -1246,21 +1441,47 @@ export default function Scene({
           );
       });
       glowTexture.dispose();
-      renderer.dispose();
-      renderer.forceContextLoss();
-      canvas.remove();
+      pose.current = {
+        position: camera.position.clone(),
+        target: target.clone(),
+        azimuth,
+        polar,
+        zoom,
+        userOrbit,
+      };
     };
     // Topology, not narration or live metrics, determines geometry lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shapeKey]);
+
+  useEffect(
+    () => () => {
+      const renderer = rendererRef.current;
+      if (renderer) {
+        renderer.dispose();
+        renderer.forceContextLoss();
+        renderer.domElement.remove();
+        rendererRef.current = null;
+      }
+    },
+    [],
+  );
 
   // Resetting should be an explicit camera command without rebuilding the scene.
   useEffect(() => {
     dirty.current = true;
   }, [resetKey]);
   const chapter = story.chapters[Math.min(step, story.chapters.length - 1)];
+  const displayObjects = story.objects.filter(
+    (actor) =>
+      !focusArea ||
+      actor.portal ||
+      actor.area === focusArea ||
+      (focusArea === "transaction" && step === 2 && actor.area === "network"),
+  );
   return (
     <div
+      data-focus={focusArea}
       className={`scene spatial-scene ${compact ? "spatial-compact" : ""} ${fallback ? "spatial-fallback" : ""} ${className}`}
       data-scene={story.id}
       data-step={step}
@@ -1273,8 +1494,11 @@ export default function Scene({
       <div className="world-atmosphere" aria-hidden="true" />
       {fallback ? (
         <div className="spatial-fallback-objects">
-          {story.objects
-            .filter((a) => !a.secondary || story.network)
+          {displayObjects
+            .filter(
+              (a) =>
+                !a.secondary || story.network || a.networkIndex !== undefined,
+            )
             .map((actor) => (
               <button
                 key={actor.id}
@@ -1294,7 +1518,11 @@ export default function Scene({
                 </span>
                 <strong>{actor.label}</strong>
                 <span>
-                  {spatialObjectValue(actor, !!story.network, progress)}
+                  {spatialObjectValue(
+                    actor,
+                    !!story.network || actor.networkIndex !== undefined,
+                    progress,
+                  )}
                 </span>
               </button>
             ))}
@@ -1307,39 +1535,54 @@ export default function Scene({
           className="world-labels"
           aria-label="Objects in the 3D explanation"
         >
-          {story.objects.map((actor) => (
+          {displayObjects.map((actor) => (
             <button
               key={actor.id}
+              data-object-id={actor.id}
               ref={(el) => {
                 if (el) labels.current.set(actor.id, el);
                 else labels.current.delete(actor.id);
               }}
-              className={`world-label ${actor.step === step ? "current" : ""} ${selectedId === actor.id ? "selected" : ""} ${actor.offline ? "offline" : ""}`}
+              className={`world-label ${actor.portal ? "portal-label" : ""} ${actor.step === step ? "current" : ""} ${selectedId === actor.id ? "selected" : ""} ${actor.offline ? "offline" : ""}`}
               style={
                 {
                   "--object-color": actor.color ?? story.color,
                 } as React.CSSProperties
               }
               onClick={() => choose(actor.id)}
-              aria-label={`Inspect ${actor.label}: ${spatialObjectValue(actor, !!story.network, progress)}`}
+              aria-label={
+                actor.portal
+                  ? `Explore ${actor.label}`
+                  : `Inspect ${actor.label}: ${spatialObjectValue(actor, !!story.network || actor.networkIndex !== undefined, progress)}`
+              }
             >
               <span className="world-label-title">
                 <i />
                 {actor.label}
               </span>
               <strong>
-                {lens === "trust"
-                  ? "TRUST ASSUMPTION"
-                  : lens === "flow"
-                    ? (story.flows.find(
-                        (f) =>
-                          f.step === step &&
-                          (f.from === actor.id || f.to === actor.id),
-                      )?.label ??
-                      spatialObjectValue(actor, !!story.network, progress))
-                    : spatialObjectValue(actor, !!story.network, progress)}
+                {actor.portal
+                  ? actor.value
+                  : lens === "trust"
+                    ? "TRUST ASSUMPTION"
+                    : lens === "flow"
+                      ? (story.flows.find(
+                          (f) =>
+                            f.step === step &&
+                            (f.from === actor.id || f.to === actor.id),
+                        )?.label ??
+                        spatialObjectValue(
+                          actor,
+                          !!story.network || actor.networkIndex !== undefined,
+                          progress,
+                        ))
+                      : spatialObjectValue(
+                          actor,
+                          !!story.network || actor.networkIndex !== undefined,
+                          progress,
+                        )}
               </strong>
-              {lens === "trust" && (
+              {lens === "trust" && !actor.portal && (
                 <span className="world-label-trust">{actor.trust}</span>
               )}
             </button>
@@ -1382,7 +1625,7 @@ export default function Scene({
         >
           <List size={14} />
           <span>Objects</span>
-          <small>{story.objects.length}</small>
+          <small>{displayObjects.length}</small>
         </button>
         {!cameraMode && (
           <button
@@ -1405,7 +1648,7 @@ export default function Scene({
               <X size={13} />
             </button>
           </div>
-          {story.objects.map((actor) => (
+          {displayObjects.map((actor) => (
             <button key={actor.id} onClick={() => choose(actor.id)}>
               <span style={{ background: actor.color ?? story.color }} />
               <strong>{actor.label}</strong>
@@ -1434,7 +1677,11 @@ export default function Scene({
           </div>
           <h3>{selectedObject.label}</h3>
           <strong style={{ color: selectedObject.color ?? story.color }}>
-            {spatialObjectValue(selectedObject, !!story.network, progress)}
+            {spatialObjectValue(
+              selectedObject,
+              !!story.network || selectedObject.networkIndex !== undefined,
+              progress,
+            )}
           </strong>
           <p>{selectedObject.detail}</p>
           <dl>

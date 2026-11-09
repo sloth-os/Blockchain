@@ -5,7 +5,8 @@ import "@fontsource-variable/dm-sans";
 import "@fontsource/ibm-plex-mono/400.css";
 import App from "./App";
 import "./styles.css";
-import "./spatial.css";
+import "./scene.css";
+import "./workspace.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
