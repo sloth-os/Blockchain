@@ -1,29 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
-  ArrowRight,
   ArrowUpRight,
   BookOpen,
   Box,
-  Check,
-  CircleDot,
   Code2,
-  Compass,
   ExternalLink,
   GitBranch,
   Globe2,
   Layers3,
   Menu,
-  MoveUpRight,
-  Network,
   Pause,
   Play,
   Search,
-  ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react";
-import Scene from "./Scene";
+import Experience from "./Experience";
 import {
   applications,
   glossary,
@@ -31,15 +24,7 @@ import {
   sources,
   topics,
 } from "./content";
-import { defaultNetwork, simulateNetwork } from "./models";
-import {
-  Dialog,
-  Eyebrow,
-  PanelHeader,
-  SourceLink,
-  Stat,
-  Tag,
-} from "./components";
+import { Dialog, Eyebrow, SourceLink, Tag } from "./components";
 import { Applications, Compare, Journey, Networks, Signals } from "./Pages";
 
 export type Route =
@@ -163,7 +148,7 @@ export default function App() {
           </span>
           <span>
             chain<span className="brand-light">atlas</span>
-            <sup>®</sup>
+            <sup>LAB</sup>
           </span>
         </a>
         <span className="header-divider" />
@@ -225,11 +210,7 @@ export default function App() {
       </header>
       <main id="main-content" tabIndex={-1} key={route}>
         {route === "explore" && (
-          <Overview
-            navigate={navigate}
-            motion={motion}
-            toggleMotion={toggleMotion}
-          />
+          <Overview navigate={navigate} motion={motion} />
         )}
         {route === "journey" && <Journey motion={motion} />}
         {route === "networks" && <Networks motion={motion} />}
@@ -337,15 +318,10 @@ export default function App() {
 function Overview({
   navigate,
   motion,
-  toggleMotion,
 }: {
   navigate: Navigate;
   motion: boolean;
-  toggleMotion: () => void;
 }) {
-  const [selected, setSelected] = useState<number | null>(null);
-  const [block, setBlock] = useState<number | null>(null);
-  const net = simulateNetwork(defaultNetwork);
   const cards = [
     {
       icon: GitBranch,
@@ -418,208 +394,7 @@ function Overview({
           </div>
         </div>
       </section>
-      <section
-        className="overview-grid"
-        aria-label="Interactive network overview"
-      >
-        <div className="network-card panel">
-          <PanelHeader number="01" title="THE LIVING LEDGER">
-            <span className="simulation-pill">
-              <span className={motion ? "live-dot" : "quiet-dot"} />
-              {motion ? "SIMULATION RUNNING" : "MOTION PAUSED"}
-            </span>
-            <button
-              className="icon-button"
-              onClick={toggleMotion}
-              aria-label={
-                motion ? "Pause network animation" : "Play network animation"
-              }
-            >
-              {motion ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <button
-              className="icon-button"
-              onClick={() => navigate("networks")}
-              aria-label="Open full network lab"
-            >
-              <MoveUpRight size={16} />
-            </button>
-          </PanelHeader>
-          <div className="overview-scene">
-            <div className="scene-coordinate">
-              P2P NETWORK <span>18 NODES / DISTRIBUTED</span>
-            </div>
-            <Scene
-              playing={motion}
-              selected={selected}
-              onSelect={(n) => {
-                setSelected(n);
-                setBlock(null);
-              }}
-            />
-            <div className="scene-side-label">NO CENTRAL AUTHORITY</div>
-            <div className="scene-bottom">
-              <div className="legend">
-                <span>
-                  <i className="green" />
-                  Peer node
-                </span>
-                <span>
-                  <i className="purple" />
-                  Validator role
-                </span>
-                <span>
-                  <i className="packet" />
-                  Data packet
-                </span>
-              </div>
-              <span className="orbit-hint">
-                <Compass size={12} />
-                Drag to orbit · Select a node
-              </span>
-            </div>
-          </div>
-          <div className="ledger-strip">
-            <div className="ledger-label">
-              <GitBranch size={15} />
-              <div>
-                THE BLOCKCHAIN<span>ILLUSTRATIVE HEADERS</span>
-              </div>
-            </div>
-            {[282, 283, 284].map((n, i) => (
-              <div className="ledger-item" key={n}>
-                <button
-                  className={block === n ? "selected" : ""}
-                  onClick={() => {
-                    setBlock(n);
-                    setSelected(null);
-                  }}
-                >
-                  <Box size={16} />
-                  <div>
-                    Block #{n}
-                    <span>{["a82f…9c41", "4f1b…e8d2", "7dc9…3a06"][i]}</span>
-                  </div>
-                  <Check size={12} />
-                </button>
-                {i < 2 && <span className="chain-connector" />}
-              </div>
-            ))}
-            <span className="ledger-ellipsis">···</span>
-          </div>
-        </div>
-        <aside className="insight-panel panel">
-          <PanelHeader
-            title={
-              selected !== null
-                ? "NODE INSPECTOR"
-                : block !== null
-                  ? "BLOCK INSPECTOR"
-                  : "A LOOK UNDER THE HOOD"
-            }
-          >
-            <CircleDot size={14} />
-          </PanelHeader>
-          <div className="insight-body">
-            <div className="insight-icon">
-              {selected !== null ? (
-                <Network />
-              ) : block !== null ? (
-                <Box />
-              ) : (
-                <Network />
-              )}
-              <span className="icon-orbit" />
-            </div>
-            <Eyebrow>
-              {selected !== null
-                ? `PEER N${String(selected + 1).padStart(2, "0")}`
-                : block !== null
-                  ? `BLOCK #${block}`
-                  : "MANY COMPUTERS. ONE SHARED STORY."}
-            </Eyebrow>
-            <h2>
-              {selected !== null ? (
-                <>
-                  A witness.
-                  <br />
-                  <span>And a verifier.</span>
-                </>
-              ) : block !== null ? (
-                <>
-                  A fingerprint
-                  <br />
-                  <span>of history.</span>
-                </>
-              ) : (
-                <>
-                  A network.
-                  <br />
-                  <span>Not a middleman.</span>
-                </>
-              )}
-            </h2>
-            <p>
-              {selected !== null
-                ? `This simulated ${selected % 3 === 0 ? "validator-role" : "peer"} node maintains its own view and checks messages against the same rules. Colored roles are schematic; actual validator/miner duties depend on the protocol.`
-                : block !== null
-                  ? `Header #${block} references its parent’s hash and commits to its contents. Editing a past block changes its hash, breaking the expected links. Consensus determines which valid history nodes accept.`
-                  : "Instead of one company keeping the record, independent computers exchange, verify and agree on a shared history."}
-            </p>
-            <div className="insight-stats">
-              <Stat
-                value={
-                  selected !== null
-                    ? net.edges.filter(
-                        ([a, b]) => a === selected || b === selected,
-                      ).length
-                    : block !== null
-                      ? block - 1
-                      : 18
-                }
-                label={
-                  selected !== null
-                    ? "Peer connections"
-                    : block !== null
-                      ? "Parent block"
-                      : "Connected peers"
-                }
-              />
-              <Stat
-                value={
-                  selected !== null
-                    ? "Local"
-                    : block !== null
-                      ? "SHA"
-                      : net.edges.length
-                }
-                unit={block !== null ? "256" : undefined}
-                label={
-                  selected !== null
-                    ? "Verification"
-                    : block !== null
-                      ? "Demo hash family"
-                      : "Peer links"
-                }
-              />
-            </div>
-            <button
-              className="button primary full-width"
-              onClick={() =>
-                navigate(selected !== null ? "networks" : "journey")
-              }
-            >
-              {selected !== null
-                ? "Experiment with the network"
-                : "Trace a transaction"}
-              <ArrowRight size={16} />
-            </button>
-            <div className="safe-note">
-              <ShieldCheck size={12} />A safe sandbox. No wallet. No real funds.
-            </div>
-          </div>
-        </aside>
-      </section>
+      <Experience motion={motion} />
       <div className="section-heading">
         <div>
           <Eyebrow>CHOOSE YOUR NEXT DISCOVERY</Eyebrow>

@@ -10,7 +10,7 @@ Chain Atlas connects a visual peer network to actual browser cryptography, netwo
 
 | Chapter             | What you can do                                                                                                                                                                                                                                                             |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Overview**        | Orbit a living Three.js network, inspect peers and illustrative block headers, and choose a learning path.                                                                                                                                                                  |
+| **Overview**        | Enter Protocol Theater: scrub a seven-phase transaction, follow the guided camera, inspect 24 semantic 3D objects and their real local cryptographic data, switch Data/Messages/Trust lenses, or expand into immersive mode.                                                |
 | **Transaction lab** | Follow compose → sign → broadcast → validate → build → agree → settle. Inspect UTF-8 wire bytes, hashes and an actual Ed25519 signature. Tamper with the signed amount and see verification reject it. Edit a transaction to change its SHA-256 hash and Merkle commitment. |
 | **Network lab**     | Change mesh/ring/hub topology, node count, latency, bandwidth, payload size and offline percentage. Broadcast a message, inspect each peer’s first relay and arrival time, and compare reachability, p50/p95 and modeled traffic.                                           |
 | **The trade-offs**  | Compare Bitcoin, Ethereum, optimistic rollups, ZK rollups, Solana and Lightning under the same adjustable teaching workload. Inspect settlement, fees, security assumptions and bottlenecks, then explore six levels of system design.                                      |
@@ -18,6 +18,16 @@ Chain Atlas connects a visual peer network to actual browser cryptography, netwo
 | **Hot topics**      | Explore ten animated issue explainers: rollup fragmentation, stablecoins, asset tokenization, MEV, bridges, data availability, account abstraction, privacy, post-quantum security and physical infrastructure. Each links to primary sources.                              |
 
 Global search (`Ctrl/Cmd + K`) covers chapters, glossary concepts, applications and issues. URL hash routes support direct links and browser back/forward navigation under a GitHub Pages project path.
+
+## Immersive controls
+
+The landing page is a 42-second **Protocol Theater**. Play/pause, replay, change speed, scrub the timeline, or select a phase. Follow the transaction with the camera, inspect the complete protocol map, or switch to an overhead view. **Go immersive** fills the viewport; Escape returns you to the page and restores keyboard focus.
+
+Every visual object represents a participant, data structure, or verification boundary. Select an object directly or use **Objects** to inspect exact payload bytes, full signatures and public keys, complete Merkle hashes, the block commitment, remaining trust assumptions, and a primary source. Data, Messages and Trust lenses change which information is emphasized. Alter the signed amount to make real local verification fail and block later phases; restore the payload to continue.
+
+Drag to orbit, use two fingers to pinch-zoom on touch screens, use arrow keys to orbit, `+`/`−` to zoom, Enter to inspect the next object, and Home or the reset button to restore the camera. Reduced motion disables automatic playback and continuous movement while preserving manual exploration. Playback pauses when the theater is off-screen or the document is hidden.
+
+Application and hot-topic scenes use domain-specific actors and distinguish data messages, cryptographic proofs, votes and value movements. The transaction scene shows four Merkle leaves, two intermediate commitments and the root, all computed from the actual local payload. Network labels distinguish predicted, waiting, received, offline and unreachable states. Comparison objects show the same demand, resource ceiling and completed calls as the adjustable model.
 
 ## Develop
 
@@ -67,9 +77,11 @@ The signing lab uses real browser-native **Ed25519 signatures and SHA-256**, but
 - **React + TypeScript + Vite** for the static app; **Three.js** for 3D scenes; **Lucide** for icons. Fonts are bundled locally.
 - `src/content.ts`: applications, transaction stages, issue research, glossary and source registry.
 - `src/models.ts`: deterministic propagation, comparative workload math, hashing, Merkle commitments, signing and verification.
-- `src/Scene.tsx`: procedural scenes, pointer orbit, keyboard rotation/zoom, raycast node selection, reduced-motion controls and 2D WebGL fallback. Geometry, materials, textures, observers and GPU contexts are cleaned up on unmount.
+- `src/spatial.ts`: typed semantic scene graphs, actor explanations, trust assumptions, source links and causally ordered message windows for the protocol, every application and every issue.
+- `src/Experience.tsx`: protocol playback, scrubbing, information lenses, camera modes, real local cryptography and accessible immersive mode.
+- `src/Scene.tsx`: Three.js object geometry, projected DOM annotations with collision-aware placement and leader lines, raycasting, camera easing, inertial orbit, touch pinch, object inspection and semantic 2D fallback. Rendering targets at most 30 FPS, stops off-screen/hidden work, and renders paused scenes only when needed. Live data and timeline changes reuse the existing renderer; geometry, materials, textures, observers and GPU contexts are cleaned up on unmount.
 - `src/Labs.tsx` and `src/Stories.tsx`: explorable chapters; `src/App.tsx` handles routing, search and the source dialog.
-- `src/models.test.ts` and `e2e/atlas.spec.ts`: meaningful unit and production-browser checks.
+- `src/models.test.ts`, `src/spatial.test.ts` and `e2e/atlas.spec.ts`: meaningful unit and production-browser checks.
 
 Responsive layouts support mobile and desktop. Motion respects the initial system preference and can be toggled globally. Canvas controls support arrow keys, `+`/`−`, and `Enter` to select peers; the network inspector also exposes every peer as a standard button. Native dialogs support Escape and focus containment. A 2D fallback and all textual explanations remain available without WebGL. No analytics, wallet connection or runtime third-party fonts are included.
 

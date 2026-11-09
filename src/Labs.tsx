@@ -19,12 +19,14 @@ import {
   Zap,
 } from "lucide-react";
 import Scene from "./Scene";
+import { peerStory, protocolStory, solutionStory } from "./spatial";
 import { layers, stages } from "./content";
 import {
   defaultNetwork,
   hex,
   linkedDemoHeaders,
   merkleRoot,
+  merkleLevels,
   sha256,
   signTransaction,
   simulateNetwork,
@@ -109,6 +111,61 @@ export function Journey({ motion }: { motion: boolean }) {
     setAuto(false);
     setTampered(false);
   };
+  const [commitment, setCommitment] = useState("");
+  const [tree, setTree] = useState<string[][]>([]);
+  const [spatialHeader, setSpatialHeader] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    if (!transaction) {
+      setCommitment("");
+      setTree([]);
+      setSpatialHeader("");
+      return;
+    }
+    if (transaction)
+      merkleLevels([
+        transaction.payload,
+        "Sam pays Lee 1 ATLAS",
+        "Lee pays Alex 4 ATLAS",
+        "Maya pays Sam 3 ATLAS",
+      ])
+        .then(async (levels) => {
+          const root = levels.at(-1)![0];
+          const header = await linkedDemoHeaders(root);
+          if (!cancelled) {
+            setCommitment(root);
+            setTree(levels);
+            setSpatialHeader(header.currentHash);
+          }
+        })
+        .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [transaction]);
+  const spatialTransaction = useMemo(
+    () =>
+      protocolStory({
+        tx: transaction,
+        amount,
+        recipient,
+        root: commitment,
+        tree,
+        headerHash: spatialHeader,
+        verified: valid,
+        rejected: tampered && valid === false,
+      }),
+    [
+      transaction,
+      amount,
+      recipient,
+      commitment,
+      tree,
+      spatialHeader,
+      tampered,
+      valid,
+    ],
+  );
   const s = stages[stage];
   const visiblePayload = transaction
     ? tampered
@@ -244,9 +301,17 @@ export function Journey({ motion }: { motion: boolean }) {
           </PanelHeader>
           <div className="journey-scene">
             <Scene
-              pattern={s.pattern}
+              story={spatialTransaction}
+              step={stage}
               playing={motion}
-              color={tampered && stage === 3 ? "#f5948d" : "#c4f568"}
+              cameraMode="follow"
+              blocked={tampered}
+              onObjectSelect={(actor) => {
+                if (actor.step <= 3 || valid === true) {
+                  setStage(actor.step);
+                  setAuto(false);
+                }
+              }}
             />
             <div className="scene-stage-label">
               <span>{String(stage + 1).padStart(2, "0")}</span>
@@ -603,6 +668,7 @@ export function Networks({ motion }: { motion: boolean }) {
           </PanelHeader>
           <div className="network-scene">
             <Scene
+              story={peerStory(options)}
               pattern="mesh"
               nodes={options.nodes}
               topology={options.topology}
@@ -947,7 +1013,12 @@ export function Compare({ motion }: { motion: boolean }) {
               </select>
             </div>
             <div className="solution-art">
-              <Scene pattern={s.pattern} playing={motion} color={s.color} />
+              <Scene
+                story={solutionStory(s, size, demand)}
+                playing={motion}
+                compact
+                cameraMode="map"
+              />
               <div className="solution-badge">{s.short}</div>
               <Tag color={s.color}>{s.category}</Tag>
             </div>

@@ -73,7 +73,9 @@ test("network topology and failures change reachability", async ({ page }) => {
   await page.getByRole("button", { name: "Hub", exact: true }).click();
   const offline = page.getByRole("slider", { name: /Offline nodes/ });
   await offline.fill("10");
-  await expect(page.getByText("UNREACHABLE", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".network-metrics").getByText("UNREACHABLE", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Inspect node 3" }).click();
   await expect(page.getByText("Isolated", { exact: true })).toBeVisible();
   await page
@@ -196,4 +198,185 @@ test("a WebGL-free browser retains a readable compatibility view and working con
     page.getByText("BROADCAST COMPLETE", { exact: true }),
   ).toBeVisible();
   await context.close();
+});
+
+test("protocol theater scrubs every phase and preserves the live canvas in immersive mode", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Pause protocol playback", exact: true })
+    .click();
+  await page
+    .getByRole("slider", { name: "Protocol timeline", exact: true })
+    .fill("900");
+  await expect(page.locator(".protocol-phase-copy h3")).toContainText("Settle");
+  await expect(page.locator(".protocol-viewport .scene")).toHaveAttribute(
+    "data-step",
+    "6",
+  );
+  await page
+    .getByRole("button", { name: "Replay protocol from beginning" })
+    .click();
+  await expect(
+    page.getByRole("slider", { name: "Protocol timeline", exact: true }),
+  ).toHaveValue("0");
+  const canvas = await page.locator("canvas").elementHandle();
+  await page
+    .getByRole("button", { name: "Enter theater mode", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Blockchain Protocol Theater" }),
+  ).toBeVisible();
+  expect(await canvas!.evaluate((node) => node.isConnected)).toBe(true);
+  await page
+    .getByRole("button", { name: "Follow transaction camera", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Explore Build a block phase", exact: true })
+    .click();
+  await expect(page.locator(".protocol-phase-copy h3")).toContainText(
+    "Build a block",
+  );
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("dialog", { name: "Blockchain Protocol Theater" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Enter theater mode", exact: true }),
+  ).toBeFocused();
+  expect(await canvas!.evaluate((node) => node.isConnected)).toBe(true);
+});
+
+test("world objects expose real signatures, trust boundaries and complete Merkle commitments", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".protocol-crypto")).toContainText("verified");
+  await page
+    .getByRole("button", { name: "Browse scene objects", exact: true })
+    .click();
+  await page
+    .locator(".world-object-list")
+    .getByRole("button", { name: /SIGNED ENVELOPE/ })
+    .click();
+  const inspector = page.getByRole("complementary", {
+    name: "3D object inspector",
+  });
+  await expect(inspector).toContainText("Full signature");
+  await expect(
+    inspector.locator("dd").filter({ hasText: /^[a-f0-9]{128}$/ }),
+  ).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Close object inspector", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Browse scene objects", exact: true })
+    .click();
+  await page
+    .locator(".world-object-list")
+    .getByRole("button", { name: /PRIVATE KEY/ })
+    .click();
+  await expect(inspector).toContainText("Never transmitted");
+  await expect(inspector).toContainText("TRUST BOUNDARY");
+  await page
+    .getByRole("button", { name: "Close object inspector", exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "Information lens" })
+    .getByRole("button", { name: "Trust", exact: true })
+    .click();
+  await expect(page.locator(".world-label-trust").first()).toContainText(
+    "The wallet must show",
+  );
+  await page
+    .getByRole("button", { name: "Browse scene objects", exact: true })
+    .click();
+  await page
+    .locator(".world-object-list")
+    .getByRole("button", { name: /MERKLE COMMITMENT/ })
+    .click();
+  await expect(
+    inspector.locator("dd").filter({ hasText: /^[a-f0-9]{64}$/ }),
+  ).toHaveCount(1);
+  await expect(
+    page
+      .locator(".protocol-viewport .world-label-title")
+      .filter({ hasText: /TRANSACTION [1-4] HASH/ }),
+  ).toHaveCount(4);
+});
+
+test("immersive signature tampering blocks future phases and restores verified playback", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".protocol-crypto")).toContainText("verified");
+  await page
+    .getByRole("button", { name: "Alter signed amount", exact: true })
+    .click();
+  await expect(page.locator(".protocol-crypto")).toContainText(
+    "signature rejected",
+  );
+  await expect(
+    page.getByRole("button", { name: "Explore Settle phase", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("slider", { name: "Protocol timeline", exact: true })
+    .fill("1000");
+  await expect(page.locator(".protocol-viewport .scene")).toHaveAttribute(
+    "data-step",
+    "3",
+  );
+  await page
+    .getByRole("button", { name: "Restore payload", exact: true })
+    .click();
+  await expect(page.locator(".protocol-crypto")).toContainText("verified");
+  await page
+    .getByRole("button", { name: "Explore Settle phase", exact: true })
+    .click();
+  await expect(page.locator(".protocol-viewport .scene")).toHaveAttribute(
+    "data-step",
+    "6",
+  );
+});
+
+test("reduced motion freezes the spatial world while manual exploration stays functional", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await expect(page.locator(".protocol-crypto")).toContainText("verified");
+  await expect(
+    page.getByRole("button", { name: "Play protocol playback", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Explore Sign phase", exact: true })
+    .click();
+  await expect(page.locator(".protocol-viewport .scene")).toHaveAttribute(
+    "data-step",
+    "1",
+  );
+  const canvas = page.locator("canvas");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  const first = await canvas.screenshot();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  const second = await canvas.screenshot();
+  expect(second.equals(first)).toBe(true);
+  await page
+    .getByRole("button", { name: "Enter theater mode", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Enter theater mode", exact: true }),
+  ).toBeFocused();
 });

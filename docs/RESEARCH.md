@@ -92,3 +92,15 @@ Percentiles include the source at time zero and only reachable nodes. Reachabili
 The browser’s Web Crypto API generates an ephemeral Ed25519 key, signs a JSON payload and verifies its bytes. Altering the amount invalidates the signature. A separate exercise computes real SHA-256 hashes and a simplified four-leaf Merkle root, hashing concatenated hexadecimal child digests and duplicating odd final leaves. These encodings are explicitly pedagogical; Bitcoin, Ethereum and Solana specify their own structures and domain rules.
 
 The demo does not implement real balances, consensus, a replay-protected network, legal ownership or production wallet software. It demonstrates integrity and authorization while explaining the remaining requirements.
+
+### Spatial narratives and motion
+
+The seven-phase Protocol Theater uses an editorial 42-second timeline. Its elapsed seconds are **narration time**, not a measured blockchain’s confirmation or finality time. The scene shows five relay actors for legibility; its separate propagation readout references the documented 18-node teaching model. Only the network lab's reported milliseconds follow the deterministic link model.
+
+Protocol message paths have explicit causal windows: submission precedes relay, relay precedes forwarding, child hashes precede parent commitments, the root precedes the header commitment, and proposals precede returning votes. Full local signatures, public keys, transaction hashes, all four Merkle leaves, both intermediate hashes, the root and the header hash are inspectable. Cryptography is computed locally when the draft is prepared; animation explains the relationship between those results rather than timing the computation.
+
+The semantic scene model distinguishes data, value, proof and vote paths. For example, an oracle report is not a transfer of money; a redemption request and a redemption settlement have different directions. Application arrows represent conceptual participants and processing stages rather than complete production message protocols. Domain-specific trust boundaries remain linked to primary sources.
+
+Application/issue message motions repeat while a phase is viewed. Comparison motion is normalized to offered load to emphasize a bottleneck; particle velocities, geometric sizes and decorative pulses are not empirical latency or throughput measurements. Predicted peer arrival is explicitly distinguished from receipt; offline and disconnected peers never claim to have received a message.
+
+The three validator glyphs are an equal-weight schematic. Ethereum uses stake-weighted checkpoint votes, Bitcoin uses accumulated proof of work, and neither is implemented as real consensus here. Fast display motion does not imply instant settlement, a guaranteed peg, legal ownership or off-chain delivery.

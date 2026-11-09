@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import Scene from "./Scene";
+import { applicationStory, topicStory } from "./spatial";
 import { applications, researchDate, topics } from "./content";
 import {
   Eyebrow,
@@ -75,7 +76,13 @@ export function Applications({
             <Tag color={app.color}>{app.category}</Tag>
           </PanelHeader>
           <div className="app-scene">
-            <Scene pattern={app.pattern} color={app.color} playing={motion} />
+            <Scene
+              story={applicationStory(app)}
+              step={step}
+              playing={motion}
+              cameraMode="map"
+              onObjectSelect={(actor) => setStep(actor.step)}
+            />
             <div className="app-mark" style={{ color: app.color }}>
               {app.mark}
             </div>
@@ -329,9 +336,14 @@ export function Signals({
           </PanelHeader>
           <div className="topic-scene">
             <Scene
-              pattern={topic.pattern}
-              color={topic.color}
+              story={topicStory(topic)}
+              step={step}
               playing={motion && animate}
+              cameraMode="map"
+              onObjectSelect={(actor) => {
+                setStep(actor.step);
+                setAnimate(false);
+              }}
             />
             <div className="topic-scene-caption">
               <span>THE MECHANISM</span>

@@ -324,17 +324,23 @@ export async function verifyTransaction(
   );
 }
 
-export async function merkleRoot(leaves: string[]): Promise<string> {
-  if (!leaves.length) return sha256("");
+export async function merkleLevels(leaves: string[]): Promise<string[][]> {
+  if (!leaves.length) return [[await sha256("")]];
   let level = await Promise.all(leaves.map(sha256));
+  const levels = [level];
   while (level.length > 1) {
     const next: Promise<string>[] = [];
     // Explicit teaching convention: hash concatenated hexadecimal child hashes.
     for (let i = 0; i < level.length; i += 2)
       next.push(sha256(level[i] + (level[i + 1] ?? level[i])));
     level = await Promise.all(next);
+    levels.push(level);
   }
-  return level[0];
+  return levels;
+}
+
+export async function merkleRoot(leaves: string[]): Promise<string> {
+  return (await merkleLevels(leaves)).at(-1)![0];
 }
 
 /** Minimal JSON headers: commit to the transaction tree, then link the next block. */
