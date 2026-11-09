@@ -3,6 +3,8 @@ import { ChevronRight, Focus, Layers3, List, RotateCcw, X } from "lucide-react";
 import * as THREE from "three";
 import { SourceLink } from "./components";
 import { defaultNetwork, type Pattern, type Topology } from "./models";
+import { createGameRuntime } from "./game/runtime";
+import type { GameBridge } from "./game/types";
 import {
   fallbackPatternStory,
   peerStory,
@@ -40,6 +42,8 @@ interface Props {
   blocked?: boolean;
   onObjectSelect?: (actor: SpatialObject) => void;
   focusArea?: string;
+  game?: GameBridge;
+  onFallbackChange?: (fallback: boolean) => void;
   selectedObjectId?: string | null;
   cameraFrame?: { target: Point3; distance: number; fit?: number };
   safeInsets?: {
@@ -83,6 +87,8 @@ export default function Scene({
   selectedObjectId,
   cameraFrame,
   safeInsets,
+  game,
+  onFallbackChange,
 }: Props) {
   const generated = useMemo(
     () =>
@@ -132,6 +138,7 @@ export default function Scene({
   };
   const motionAllowed = motion ?? playing;
   const latest = useRef({
+    game,
     focusArea,
     cameraFrame,
     safeInsets,
@@ -155,6 +162,7 @@ export default function Scene({
   });
   useEffect(() => {
     latest.current = {
+      game,
       focusArea,
       cameraFrame,
       safeInsets,
@@ -179,6 +187,9 @@ export default function Scene({
     dirty.current = true;
   });
   useEffect(() => {
+    onFallbackChange?.(fallback);
+  }, [fallback, onFallbackChange]);
+  useEffect(() => {
     setPicked(null);
     setList(false);
   }, [story.id]);
@@ -191,6 +202,7 @@ export default function Scene({
   // Geometry lives until the semantic topology changes; live data never recreates a GPU context.
   const shapeKey =
     story.id +
+    `|${game?.run ?? "atlas"}|` +
     "|" +
     story.objects.map((o) => `${o.id}:${o.kind}`).join(",") +
     "|" +
@@ -224,7 +236,9 @@ export default function Scene({
     canvas.setAttribute("role", "img");
     canvas.setAttribute(
       "aria-label",
-      `Interactive 3D ${story.title}. Drag or use arrow keys to orbit. Plus and minus zoom. Enter inspects an object.`,
+      game
+        ? "Chain Runner 3D game. WASD or arrow keys fly. E interacts nearby. Space dashes. Drag to orbit; plus and minus zoom."
+        : `Interactive 3D ${story.title}. Drag or use arrow keys to orbit. Plus and minus zoom. Enter inspects an object.`,
     );
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2("#09131a", 0.022);
@@ -690,6 +704,9 @@ export default function Scene({
       }),
     );
     scene.add(stars);
+    const gameRuntime = game
+      ? createGameRuntime(scene, camera, () => latest.current.game)
+      : null;
 
     const mapCenter = new THREE.Vector3();
     let smallLayout = false;
@@ -756,7 +773,9 @@ export default function Scene({
         ];
       const pickedActor =
         current.selectedId && actorGroups.get(current.selectedId);
-      if (current.cameraFrame)
+      if (current.game && gameRuntime && !current.game.overview)
+        desiredTarget.copy(gameRuntime.worldPosition());
+      else if (current.cameraFrame)
         desiredTarget.copy(vec(current.cameraFrame.target));
       else if (current.view === "follow" && !current.story.network) {
         desiredTarget.copy(pickedActor ? pickedActor.base : vec(chapter.focus));
@@ -837,12 +856,14 @@ export default function Scene({
         (-(event.clientY - box.top) / height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      const visible = pickable.filter(
-        (mesh) =>
-          !latest.current.story.objects.find(
-            (actor) => actor.id === mesh.userData.actor,
-          )?.portal || latest.current.focusArea === "atlas",
-      );
+      const visible = pickable.filter((mesh) => {
+        const actor = latest.current.story.objects.find(
+          (actor) => actor.id === mesh.userData.actor,
+        );
+        return latest.current.game
+          ? actor?.area === "game" && !actor.collected
+          : !actor?.portal || latest.current.focusArea === "atlas";
+      });
       return raycaster.intersectObjects(visible, false)[0]?.object.userData
         .actor as string | undefined;
     };
@@ -913,6 +934,16 @@ export default function Scene({
       if (dragging && travel < 7) {
         const id = hitAt(e);
         if (id) latest.current.choose(id);
+        else if (gameRuntime && latest.current.game?.running) {
+          const point = new THREE.Vector3();
+          if (
+            raycaster.ray.intersectPlane(
+              new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+              point,
+            )
+          )
+            gameRuntime.navigateWorld(point);
+        }
       }
       dragging = false;
     };
@@ -929,6 +960,8 @@ export default function Scene({
       dirty.current = true;
     };
     const keyboard = (e: KeyboardEvent) => {
+      if (latest.current.game && !["+", "=", "-", "Home"].includes(e.key))
+        return;
       if (
         ![
           "ArrowLeft",
@@ -991,6 +1024,21 @@ export default function Scene({
         "signed",
         "recipient",
       ];
+      if (current.game?.hud.current) {
+        const origin = host.getBoundingClientRect();
+        current.game.hud.current
+          .querySelectorAll<HTMLElement>("[data-game-obstacle]")
+          .forEach((element) => {
+            const box = element.getBoundingClientRect();
+            if (box.width && box.height)
+              occupied.push({
+                x: box.x - origin.x + box.width / 2,
+                y: box.y - origin.y + box.height / 2,
+                w: box.width,
+                h: box.height,
+              });
+          });
+      }
       const rank = (actor: SpatialObject) =>
         actor.id === current.selectedId
           ? -1000
@@ -1124,6 +1172,7 @@ export default function Scene({
             );
           });
         const hidden =
+          !!actor.collected ||
           !current.showLabels ||
           (current.focusArea
             ? current.focusArea === "atlas"
@@ -1228,7 +1277,10 @@ export default function Scene({
       last = now;
       lastRender = now;
       const current = latest.current;
-      const active = current.playing && inView && !document.hidden;
+      const active =
+        (current.playing || !!current.game?.running) &&
+        inView &&
+        !document.hidden;
       if (!inView || document.hidden) return;
       if (current.focusArea !== previousFocus) {
         previousFocus = current.focusArea;
@@ -1262,10 +1314,18 @@ export default function Scene({
         velocityX *= 0.86;
         velocityY *= 0.86;
       }
+      const gameMoving = gameRuntime?.update(dt) ?? false;
       const moving = setCamera(dt);
-      if (!active && !dirty.current && !moving && !dragging && !inertial)
+      if (
+        !active &&
+        !dirty.current &&
+        !moving &&
+        !dragging &&
+        !inertial &&
+        !gameMoving
+      )
         return;
-      if (active) {
+      if (active && (!current.game || current.motionAllowed)) {
         time += dt * current.speed;
         phaseTime += dt * current.speed;
       }
@@ -1275,7 +1335,11 @@ export default function Scene({
       for (const actor of current.story.objects) {
         const item = actorGroups.get(actor.id);
         if (!item) continue;
-        item.group.visible = !actor.portal || current.focusArea === "atlas";
+        item.group.visible =
+          !actor.collected &&
+          (current.game
+            ? actor.area === "game"
+            : !actor.portal || current.focusArea === "atlas");
         const index =
           actor.networkIndex ??
           (current.story.network ? Number(actor.id.slice(1)) : -1);
@@ -1391,6 +1455,7 @@ export default function Scene({
       }
       paths.forEach((path) => {
         const flow = current.story.flows[path.index];
+        path.line.visible = !current.game || flow.area === "game";
         const activeFlow =
           ((flow.step === current.step &&
             (!current.focusArea || flow.area === current.focusArea)) ||
@@ -1478,6 +1543,7 @@ export default function Scene({
     };
     frame = requestAnimationFrame(animate);
     return () => {
+      gameRuntime?.dispose();
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       intersection.disconnect();
@@ -1530,14 +1596,18 @@ export default function Scene({
   const chapter = story.chapters[Math.min(step, story.chapters.length - 1)];
   const displayObjects = story.objects.filter(
     (actor) =>
-      !focusArea ||
-      actor.portal ||
-      actor.area === focusArea ||
-      (focusArea === "transaction" && step === 2 && actor.area === "network"),
+      !actor.collected &&
+      (!focusArea ||
+        (!game && actor.portal) ||
+        actor.area === focusArea ||
+        (focusArea === "transaction" &&
+          step === 2 &&
+          actor.area === "network")),
   );
   return (
     <div
       data-focus={focusArea}
+      data-game={game ? "chain-runner" : undefined}
       className={`scene spatial-scene ${compact ? "spatial-compact" : ""} ${fallback ? "spatial-fallback" : ""} ${className}`}
       data-scene={story.id}
       data-step={step}
@@ -1558,6 +1628,7 @@ export default function Scene({
             .map((actor) => (
               <button
                 key={actor.id}
+                disabled={!!game && game.state.status !== "playing"}
                 onClick={() => choose(actor.id)}
                 style={
                   {
@@ -1594,6 +1665,7 @@ export default function Scene({
           {displayObjects.map((actor) => (
             <button
               key={actor.id}
+              disabled={!!game && game.state.status !== "playing"}
               data-object-id={actor.id}
               ref={(el) => {
                 if (el) labels.current.set(actor.id, el);
@@ -1607,9 +1679,11 @@ export default function Scene({
               }
               onClick={() => choose(actor.id)}
               aria-label={
-                actor.portal
-                  ? `Explore ${actor.label}`
-                  : `Inspect ${actor.label}: ${spatialObjectValue(actor, !!story.network || actor.networkIndex !== undefined, progress)}`
+                game
+                  ? `Fly to ${actor.label}: ${actor.value}`
+                  : actor.portal
+                    ? `Explore ${actor.label}`
+                    : `Inspect ${actor.label}: ${spatialObjectValue(actor, !!story.network || actor.networkIndex !== undefined, progress)}`
               }
             >
               <span className="world-label-title">

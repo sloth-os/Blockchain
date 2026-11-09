@@ -8,6 +8,7 @@ import "./styles.css";
 import "./scene.css";
 import "./workspace.css";
 import "./usability.css";
+import "./game/game.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

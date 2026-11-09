@@ -49,6 +49,7 @@ export interface SpatialObject {
   portal?: boolean;
   networkIndex?: number;
   sourceId?: string;
+  collected?: boolean;
 }
 export interface SpatialFlow {
   from: string;

@@ -6,6 +6,12 @@ Explore the website at **https://sloth-os.github.io/Blockchain/**.
 
 Chain Atlas connects a visual peer network to actual browser cryptography, network experiments, system design trade-offs, real applications and a sourced research agenda. It is a static website: no account, wallet, API key, backend or real funds are required.
 
+## Play Chain Runner
+
+**[Start the 3D expedition](https://sloth-os.github.io/Blockchain/?play=1)**, or select **Play** in the header. Pilot a packet courier through seven missions: exact-byte signing, network repair, Merkle commitments, weighted consensus, scaling requirements, stablecoin redemption and bridge verification. Fly with WASD/arrows, interact with E and dash with Space; touch controls and automatic station travel are available.
+
+The game adds interference hazards, checkpoints, three-star rewards, XP, local progress, a minimap and tactical camera to the same immersive world. Carry data as orbiting cargo, follow real peer links and watch commitment/stake rings fill as you restore each sector. Signatures, vote checks and Merkle proofs run locally in the browser. Reduced effects and a WebGL-free route list preserve access. See the [game design, controls, model boundaries and verification](docs/GAME_DESIGN.md).
+
 ## One immersive world
 
 The website opens directly into a full-screen 3D workspace. There are no separate lab pages or immersive-mode toggle. Five connected areas coexist in the same scene:
@@ -50,6 +56,7 @@ npm run preview         # serve the production site
 npx playwright install chromium
 npm run test:e2e        # launches its own production preview on port 4173
 npm run review:ui       # 144 visual captures; requires a running preview
+npm run review:game     # play and capture the seven-mission 3D campaign
 ```
 
 Build before running the browser suite. When Chromium is already installed, avoid downloading another browser by running:

@@ -25,7 +25,10 @@ import {
   ShieldCheck,
   Sparkles,
   X,
+  Gamepad2,
 } from "lucide-react";
+import GameHUD from "./game/GameHUD";
+import { useChainGame } from "./game/useChainGame";
 import Scene from "./Scene";
 import { Dialog, Range, SourceLink } from "./components";
 import {
@@ -44,6 +47,12 @@ import { useAtlas, type AtlasController } from "./useAtlas";
 
 export default function Workspace() {
   const c = useAtlas();
+  const [renderFallback, setRenderFallback] = useState(false);
+  const g = useChainGame(c, renderFallback);
+  const leaveGame = () => {
+    g.close();
+    c.showAtlas();
+  };
   const stageRef = useRef<HTMLDivElement>(null);
   const introRef = useRef<HTMLDivElement>(null);
   const [stageHeight, setStageHeight] = useState(600);
@@ -103,8 +112,10 @@ export default function Workspace() {
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    document.title = "Chain Atlas — one immersive blockchain world";
-  }, []);
+    document.title = g.active
+      ? "Chain Runner — a playable blockchain expedition"
+      : "Chain Atlas — one immersive blockchain world";
+  }, [g.active]);
   const safeInsets = c.panel
     ? c.mobile
       ? { right: 0, bottom: Math.min(stageHeight * 0.62, 440) }
@@ -181,14 +192,16 @@ export default function Workspace() {
             : "New transaction";
   return (
     <main
-      className={`atlas-workspace ${c.motion ? "" : "motion-paused"} ${c.panel ? "workbench-open" : ""}`}
+      className={`atlas-workspace ${g.active ? "game-active" : ""} ${c.motion ? "" : "motion-paused"} ${c.panel && !g.active ? "workbench-open" : ""}`}
       style={
         {
-          "--accent": areas[c.area].color,
+          "--accent": g.active ? g.mission.color : areas[c.area].color,
           "--reserved-right": `${safeInsets.right}px`,
         } as React.CSSProperties
       }
-      data-focus={c.overview ? "atlas" : c.area}
+      data-focus={g.active ? "game" : c.overview ? "atlas" : c.area}
+      data-game-state={g.active ? g.state.status : undefined}
+      data-game-mission={g.active ? g.mission.id : undefined}
     >
       <a
         className="skip-link"
@@ -205,7 +218,7 @@ export default function Workspace() {
         <button
           className="atlas-brand"
           aria-label="Show the connected atlas"
-          onClick={c.showAtlas}
+          onClick={g.active ? leaveGame : c.showAtlas}
         >
           <span>
             <Box size={21} />
@@ -217,16 +230,35 @@ export default function Workspace() {
         </button>
         <div className="atlas-location">
           <span className="location-dot" />
-          {c.overview ? "THE CONNECTED WORLD" : areas[c.area].title}
+          {g.active
+            ? "CHAIN RUNNER"
+            : c.overview
+              ? "THE CONNECTED WORLD"
+              : areas[c.area].title}
           <ChevronRight size={12} />
-          <span>{c.overview ? "Explore a landmark" : c.chapter.title}</span>
+          <span>
+            {g.active
+              ? g.mission.title
+              : c.overview
+                ? "Explore a landmark"
+                : c.chapter.title}
+          </span>
         </div>
         <div className="atlas-header-actions">
+          <button
+            className="game-launch"
+            aria-label={g.active ? "Open game missions" : "Play Chain Runner"}
+            title="Play Chain Runner · seven 3D missions"
+            onClick={() => (g.active ? g.setMenu("missions") : g.open())}
+          >
+            <Gamepad2 size={18} />
+            <span>{g.active ? "Missions" : "Play"}</span>
+          </button>
           <button
             className={`atlas-map-trigger ${c.overview ? "active" : ""}`}
             aria-label="Explore the connected atlas"
             title="Explore all five connected areas"
-            onClick={c.showAtlas}
+            onClick={g.active ? leaveGame : c.showAtlas}
           >
             <Compass size={15} />
             <span>Explore</span>
@@ -240,11 +272,23 @@ export default function Workspace() {
             <kbd>⌘ K</kbd>
           </button>
           <button
-            aria-label={c.motion ? "Pause all motion" : "Enable motion"}
+            aria-label={
+              g.active
+                ? c.motion
+                  ? "Reduce game effects"
+                  : "Enable game effects"
+                : c.motion
+                  ? "Pause all motion"
+                  : "Enable motion"
+            }
             title={
-              c.motion
-                ? "Pause all motion"
-                : "Enable motion · manual exploration is always available"
+              g.active
+                ? c.motion
+                  ? "Reduce visual effects · destination travel becomes instant"
+                  : "Enable animated travel and effects"
+                : c.motion
+                  ? "Pause all motion"
+                  : "Enable motion · manual exploration is always available"
             }
             onClick={c.toggleMotion}
           >
@@ -261,7 +305,9 @@ export default function Workspace() {
             className="atlas-help"
             aria-label="How to explore this world"
             title="How to explore this world"
-            onClick={() => c.setOverlay("help")}
+            onClick={() =>
+              g.active ? g.setMenu("help") : c.setOverlay("help")
+            }
           >
             <HelpCircle size={16} />
           </button>
@@ -273,43 +319,74 @@ export default function Workspace() {
         aria-label="Connected 3D blockchain world"
       >
         <Scene
-          story={c.world}
-          step={c.step}
+          story={g.active ? g.world : c.world}
+          game={g.active ? g.bridge : undefined}
+          onFallbackChange={setRenderFallback}
+          step={g.active ? 0 : c.step}
           phase={
-            c.area === "transaction" && !c.overview
+            !g.active && c.area === "transaction" && !c.overview
               ? c.head === 1
                 ? 1
                 : (c.head * 7) % 1
               : undefined
           }
-          playing={c.scenePlaying}
+          playing={
+            g.active
+              ? c.motion && (g.bridge.running || g.state.status === "briefing")
+              : c.scenePlaying
+          }
           motion={c.motion}
           speed={c.speed}
-          cameraMode={c.view}
-          cameraFrame={c.cameraFrame}
-          focusArea={c.overview ? "atlas" : c.area}
-          selectedObjectId={c.selectedId}
+          cameraMode={
+            g.active ? (g.bridge.overview ? "map" : "follow") : c.view
+          }
+          cameraFrame={
+            g.active
+              ? {
+                  target: areas[g.mission.area].focus,
+                  distance: g.bridge.overview ? 24 : 13.5,
+                  fit: g.bridge.overview ? 1.3 : 0.85,
+                }
+              : c.cameraFrame
+          }
+          focusArea={g.active ? "game" : c.overview ? "atlas" : c.area}
+          selectedObjectId={g.active ? null : c.selectedId}
           inspector={false}
-          onObjectSelect={c.pick}
-          resetKey={c.resetKey}
-          lens={c.lens}
-          blocked={c.tampered}
+          onObjectSelect={
+            g.active ? (actor) => g.navigate(actor.localId!) : c.pick
+          }
+          resetKey={c.resetKey + (g.active ? g.run * 1000 : 0)}
+          lens={g.active ? "data" : c.lens}
+          blocked={g.active ? false : c.tampered}
           offline={c.net.down}
           arrivals={c.net.times}
-          progress={c.sceneProgress}
-          safeInsets={{
-            ...safeInsets,
-            intro: introSize,
-            labelBottom:
-              stageHeight < 320
-                ? 64
-                : c.overview
-                  ? 80
-                  : c.area === "transaction"
-                    ? 166
-                    : 120,
-          }}
+          progress={g.active ? undefined : c.sceneProgress}
+          safeInsets={
+            g.active
+              ? {
+                  right: 0,
+                  bottom: c.mobile ? (stageHeight < 600 ? 145 : 225) : 0,
+                  labelBottom: c.mobile ? (stageHeight < 600 ? 190 : 260) : 160,
+                  intro: {
+                    width: c.mobile ? 250 : 365,
+                    height: c.mobile ? (stageHeight < 600 ? 115 : 175) : 250,
+                  },
+                }
+              : {
+                  ...safeInsets,
+                  intro: introSize,
+                  labelBottom:
+                    stageHeight < 320
+                      ? 64
+                      : c.overview
+                        ? 80
+                        : c.area === "transaction"
+                          ? 166
+                          : 120,
+                }
+          }
         />
+        {g.active && <GameHUD g={g} onExplore={leaveGame} />}
         <div ref={introRef} className="atlas-focus-intro">
           <div className="atlas-eyebrow">
             <i />
