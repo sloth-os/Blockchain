@@ -49,9 +49,11 @@ export function useAtlas() {
   const [overlay, setOverlay] = useState<"search" | "sources" | "help" | null>(
     null,
   );
-  const [mobile, setMobile] = useState(window.innerWidth < 900);
+  const sheetQuery =
+    "(max-width: 699px), (max-width: 899px) and (min-height: 600px)";
+  const [mobile, setMobile] = useState(matchMedia(sheetQuery).matches);
   useEffect(() => {
-    const media = matchMedia("(max-width:899px)");
+    const media = matchMedia(sheetQuery);
     const update = () => setMobile(media.matches);
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
@@ -71,7 +73,9 @@ export function useAtlas() {
   const [dataView, setDataView] = useState<"payload" | "bytes" | "signature">(
     "payload",
   );
-  const amountValid = Number(amount) > 0 && Number(amount) <= 1000;
+  const amountValid = Number(amount) >= 0.01 && Number(amount) <= 1000;
+  const maxTxStep =
+    !amountValid || (!tx && !cryptoError) ? 0 : tampered ? 3 : 6;
   useEffect(() => {
     let cancelled = false;
     setTx(null);
@@ -159,7 +163,8 @@ export function useAtlas() {
     resetDraft();
   };
   const jumpTx = (step: number) => {
-    if (tampered && step > 3) return;
+    if (Math.floor(step) > maxTxStep) return;
+    if (panel === "inspect") setPanel("notes");
     setHead(step / 7);
     setTxRun(false);
     setSelectedId(null);
@@ -178,7 +183,6 @@ export function useAtlas() {
   const [netSent, setNetSent] = useState(false);
   const [peer, setPeer] = useState(0);
   const updateNetwork = (patch: Partial<NetworkOptions>) => {
-    if (patch.payload !== undefined) setBytes(patch.payload);
     setNetwork((value) => ({ ...value, ...patch }));
     setNetRun(false);
     setNetElapsed(0);
@@ -195,8 +199,8 @@ export function useAtlas() {
 
   const [a, setA] = useState("ethereum"),
     [b, setB] = useState("optimistic");
-  const [bytes, setBytes] = useState(512),
-    [demand, setDemand] = useState(500),
+  const bytes = network.payload;
+  const [demand, setDemand] = useState(500),
     [layer, setLayer] = useState(0);
   const solutionA = solutions.find((s) => s.id === a)!,
     solutionB = solutions.find((s) => s.id === b)!;
@@ -281,6 +285,7 @@ export function useAtlas() {
         setOverlay((value) => (value === "search" ? null : "search"));
       }
       if (event.key === "Escape" && !document.querySelector("dialog[open]")) {
+        if (document.querySelector('[data-camera-open="true"]')) return;
         setPanel(null);
         setSelectedId(null);
       }
@@ -294,7 +299,15 @@ export function useAtlas() {
     ticking.current = { head, speed, tampered };
   }, [head, speed, tampered]);
   useEffect(() => {
-    if (area !== "transaction" || overview || !motion || !txRun || overlay)
+    if (
+      area !== "transaction" ||
+      overview ||
+      !motion ||
+      !txRun ||
+      overlay ||
+      !amountValid ||
+      (!tx && !cryptoError)
+    )
       return;
     let frame = 0,
       last = performance.now(),
@@ -320,7 +333,18 @@ export function useAtlas() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [area, overview, motion, txRun, overlay, speed, tampered]);
+  }, [
+    area,
+    overview,
+    motion,
+    txRun,
+    overlay,
+    speed,
+    tampered,
+    amountValid,
+    !!tx,
+    cryptoError,
+  ]);
   useEffect(() => {
     if (area !== "network" || !netRun || !motion || overview || overlay) return;
     let frame = 0,
@@ -345,17 +369,15 @@ export function useAtlas() {
       area === "applications" ? appRun : area === "topics" ? topicRun : false;
     if (!running || !motion || overview || overlay) return;
     const step = area === "applications" ? appStep : topicStep;
-    if (step === 3) {
-      area === "applications" ? setAppRun(false) : setTopicRun(false);
-      return;
-    }
-    const timer = setTimeout(
-      () =>
+    const timer = setTimeout(() => {
+      if (step === 3) {
+        area === "applications" ? setAppRun(false) : setTopicRun(false);
+      } else {
         area === "applications"
           ? setAppStep((value) => value + 1)
-          : setTopicStep((value) => value + 1),
-      4000 / speed,
-    );
+          : setTopicStep((value) => value + 1);
+      }
+    }, 4000 / speed);
     return () => clearTimeout(timer);
   }, [
     area,
@@ -428,7 +450,7 @@ export function useAtlas() {
       setArea(next);
       setOverview(false);
     }
-    if (next === "transaction" && (!tampered || actor.step <= 3)) {
+    if (next === "transaction" && actor.step <= maxTxStep) {
       setHead(actor.step / 7);
       setTxRun(false);
     }
@@ -457,6 +479,7 @@ export function useAtlas() {
   };
   const jump = (index: number) => {
     setSelectedId(null);
+    if (panel === "inspect") setPanel("notes");
     if (area === "transaction") jumpTx(index);
     if (area === "applications") {
       setAppStep(index);
@@ -479,6 +502,7 @@ export function useAtlas() {
             : false;
   const togglePlay = () => {
     if (area === "transaction") {
+      if (!amountValid || (!tx && !cryptoError)) return;
       if (head >= 1) setHead(0);
       setTxRun((v) => !v);
     }
@@ -487,11 +511,11 @@ export function useAtlas() {
       else setNetRun((v) => !v);
     }
     if (area === "applications") {
-      if (appStep === 3) setAppStep(0);
+      if (appStep === 3 && !appRun) setAppStep(0);
       setAppRun((v) => !v);
     }
     if (area === "topics") {
-      if (topicStep === 3) setTopicStep(0);
+      if (topicStep === 3 && !topicRun) setTopicStep(0);
       setTopicRun((v) => !v);
     }
   };
@@ -537,6 +561,20 @@ export function useAtlas() {
             ? app.name
             : topic.title;
   const wireBytes = (tx?.bytes ?? 103) + 64 + 32;
+  useEffect(() => {
+    if (network.payload < wireBytes) updateNetwork({ payload: wireBytes });
+  }, [wireBytes, network.payload]);
+  const netComplete = netSent && netElapsed >= net.total;
+  const netDisconnected = net.reachable < network.nodes - net.down.size;
+  const networkTitle = !netSent
+    ? "Ready to broadcast"
+    : netComplete
+      ? netDisconnected
+        ? "Broadcast finished · peers isolated"
+        : "Broadcast complete"
+      : netRun && motion
+        ? "Message propagating"
+        : "Broadcast paused";
   const sceneProgress =
     area === "transaction" && txStep === 2 && !overview
       ? (head * 7) % 1 < 0.18
@@ -590,6 +628,7 @@ export function useAtlas() {
     tampered,
     cryptoError,
     amountValid,
+    maxTxStep,
     receivedPayload,
     dataView,
     setDataView,
@@ -606,6 +645,9 @@ export function useAtlas() {
     netElapsed,
     netRun,
     netSent,
+    networkTitle,
+    netComplete,
+    netDisconnected,
     peer,
     setPeer,
     updateNetwork,

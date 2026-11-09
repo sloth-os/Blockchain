@@ -803,18 +803,6 @@
     transition: none;
   }
 }
-@media (min-width: 761px) {
-  .world-label:not(.spatial-compact .world-label) {
-    width: 166px;
-    max-width: 166px;
-  }
-  .world-label:not(.spatial-compact .world-label) .world-label-title {
-    font-size: 7px;
-  }
-  .world-label:not(.spatial-compact .world-label) strong {
-    font-size: 9px;
-  }
-}
 .world-label:after {
   height: var(--leader-length, 15px);
   transform-origin: top center;

@@ -172,7 +172,7 @@ test("the transaction trace and propagation experiment use the same reshaped pee
     page.getByRole("button", { name: "ring", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".atlas-narration h2")).toHaveText(
-    "Broadcast complete",
+    "Broadcast paused",
   );
   await focus(page, "scale");
   await tools(page);
@@ -194,7 +194,7 @@ test("topology failures expose disconnected healthy peers and can recover", asyn
     .getByRole("button", { name: "Broadcast a message", exact: true })
     .click();
   await expect(page.locator(".atlas-narration h2")).toHaveText(
-    "Broadcast complete",
+    "Broadcast finished · peers isolated",
   );
   await page
     .getByRole("button", { name: "Reset the network", exact: true })
@@ -402,7 +402,21 @@ test("reduced motion freezes rendering while manual exploration remains availabl
   await expect(
     page.getByText("Real local signature verified", { exact: true }),
   ).toBeVisible();
-  const before = await page.locator("canvas").screenshot();
+  await page.evaluate(() => document.fonts.ready);
+  let before = await page.locator("canvas").screenshot();
+  // Wait for startup font/layout changes and the initial GPU frame to settle.
+  // Continuous movement still fails this check rather than being retried away.
+  await expect
+    .poll(
+      async () => {
+        const next = await page.locator("canvas").screenshot();
+        const stable = next.equals(before);
+        before = next;
+        return stable;
+      },
+      { timeout: 10_000, intervals: [100, 250] },
+    )
+    .toBe(true);
   await page.waitForTimeout(250);
   expect((await page.locator("canvas").screenshot()).equals(before)).toBe(true);
   await page

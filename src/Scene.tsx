@@ -45,6 +45,7 @@ interface Props {
   safeInsets?: {
     right: number;
     bottom: number;
+    labelBottom?: number;
     intro?: { width: number; height: number };
   };
 }
@@ -836,7 +837,13 @@ export default function Scene({
         (-(event.clientY - box.top) / height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      return raycaster.intersectObjects(pickable, false)[0]?.object.userData
+      const visible = pickable.filter(
+        (mesh) =>
+          !latest.current.story.objects.find(
+            (actor) => actor.id === mesh.userData.actor,
+          )?.portal || latest.current.focusArea === "atlas",
+      );
+      return raycaster.intersectObjects(visible, false)[0]?.object.userData
         .actor as string | undefined;
     };
     const pointerDown = (e: PointerEvent) => {
@@ -1049,20 +1056,46 @@ export default function Scene({
           current.story.id === "protocol" ? 85 : current.compact ? 25 : 38;
         // Small screens retain five anchored landmarks in readable rows.
         // Leader lines still connect each label to its world-space object.
-        if (actor.portal && current.focusArea === "atlas" && width < 700) {
-          const layout: Record<string, [number, number]> = {
-            transaction: [0.5, 2],
-            network: [0.25, 1],
-            scale: [0.75, 1],
-            applications: [0.75, 0],
-            topics: [0.25, 0],
-          };
+        if (
+          actor.portal &&
+          current.focusArea === "atlas" &&
+          (width < 700 || height < 600)
+        ) {
+          const landscape = width >= 700;
+          const layout: Record<string, [number, number]> = landscape
+            ? {
+                transaction: [0.18, 1],
+                network: [0.5, 1],
+                scale: [0.82, 1],
+                applications: [0.68, 0],
+                topics: [0.32, 0],
+              }
+            : {
+                transaction: [0.5, 2],
+                network: [0.25, 1],
+                scale: [0.75, 1],
+                applications: [0.75, 0],
+                topics: [0.25, 0],
+              };
           const [column, row] = layout[actor.area ?? "transaction"];
           const top = current.safeInsets?.intro?.height ?? 150;
-          const spacing = clamp((height - top - 165) / 3, 55, 85);
+          const spacing = landscape
+            ? h + 8
+            : Math.max(
+                h + 10,
+                Math.min(
+                  100,
+                  (height -
+                    top -
+                    (current.safeInsets?.labelBottom ?? 100) -
+                    h -
+                    24) /
+                    2,
+                ),
+              );
           offsets.unshift([
-            width * column - x,
-            top + h + 18 + row * spacing - y,
+            clamp(width * column, w / 2 + 12, width - w / 2 - 12) - x,
+            top + h + (landscape ? 8 : 16) + row * spacing - y,
           ]);
         }
         const candidate = offsets
@@ -1071,13 +1104,17 @@ export default function Scene({
             if (
               p.x < w / 2 + 7 ||
               p.x > width - (current.safeInsets?.right ?? 0) - w / 2 - 7 ||
-              p.y - h < 58 ||
+              p.y - h < (height < 350 ? 8 : 45) ||
               (current.safeInsets?.intro &&
                 p.x - w / 2 < current.safeInsets.intro.width &&
                 p.y - h < current.safeInsets.intro.height) ||
               p.y >
                 height -
-                  Math.max(reservedBottom, current.safeInsets?.bottom ?? 0)
+                  Math.max(
+                    reservedBottom,
+                    current.safeInsets?.bottom ?? 0,
+                    current.safeInsets?.labelBottom ?? 0,
+                  )
             )
               return false;
             return !occupied.some(
@@ -1139,6 +1176,7 @@ export default function Scene({
           shown++;
         }
       }
+      let flowLabelsShown = 0;
       paths.forEach((path) => {
         const el = flowLabels.current.get(path.index);
         if (!el) return;
@@ -1155,6 +1193,11 @@ export default function Scene({
           !current.showLabels ||
           current.lens === "trust" ||
           current.compact ||
+          (!!flow.networkEdge &&
+            (current.selectedId
+              ? flow.from !== current.selectedId &&
+                flow.to !== current.selectedId
+              : flowLabelsShown >= 4)) ||
           (current.lens !== "flow" &&
             (current.story.network || flow.networkEdge)) ||
           (!(
@@ -1173,6 +1216,8 @@ export default function Scene({
           projected.z > 1
             ? "hidden"
             : "visible";
+        if (el.style.visibility === "visible" && flow.networkEdge)
+          flowLabelsShown++;
         el.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%)`;
       });
     };
@@ -1230,6 +1275,7 @@ export default function Scene({
       for (const actor of current.story.objects) {
         const item = actorGroups.get(actor.id);
         if (!item) continue;
+        item.group.visible = !actor.portal || current.focusArea === "atlas";
         const index =
           actor.networkIndex ??
           (current.story.network ? Number(actor.id.slice(1)) : -1);
@@ -1293,9 +1339,11 @@ export default function Scene({
               ? 0.2
               : isActive || chosen
                 ? 0.96
-                : sameArea
-                  ? 0.45
-                  : 0.16);
+                : current.focusArea === "atlas"
+                  ? 0.65
+                  : sameArea
+                    ? 0.45
+                    : 0.16);
         });
         item.glyph.traverse((child) => {
           if (child instanceof THREE.Sprite) {
@@ -1309,7 +1357,15 @@ export default function Scene({
           ) {
             child.material.color.set(tint);
             child.material.opacity =
-              isOffline || isBlocked ? 0.12 : isActive && reached ? 0.85 : 0.34;
+              isOffline || isBlocked
+                ? 0.12
+                : isActive && reached
+                  ? 0.85
+                  : sameArea
+                    ? 0.34
+                    : current.focusArea === "atlas"
+                      ? 0.5
+                      : 0.1;
           }
         });
         (item.halo.material as THREE.MeshBasicMaterial).color.set(tint);
@@ -1564,8 +1620,21 @@ export default function Scene({
                 {actor.portal
                   ? actor.value
                   : lens === "trust"
-                    ? "TRUST ASSUMPTION"
-                    : lens === "flow"
+                    ? {
+                        wallet: "Who controls the key?",
+                        key: "How is authority protected?",
+                        data: "Who attests to the inputs?",
+                        peer: "Can this peer deliver?",
+                        block: "Which rules were checked?",
+                        proof: "What does the proof assume?",
+                        vault: "Who controls the assets?",
+                        coin: "What backs this claim?",
+                        contract: "Who can change the code?",
+                        validator: "Which quorum decides?",
+                        shard: "Can the data be recovered?",
+                        person: "Who can participate?",
+                      }[actor.kind]
+                    : lens === "flow" && actor.networkIndex === undefined
                       ? (story.flows.find(
                           (f) =>
                             f.step === step &&

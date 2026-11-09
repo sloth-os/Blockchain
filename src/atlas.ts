@@ -116,6 +116,7 @@ export function buildAtlas(input: Inputs): SpatialStory {
   const app = applicationStory(input.app),
     topic = topicStory(input.topic),
     network = peerStory(input.network);
+  const delivery = simulateNetwork(input.network);
   const laneA = solutionStory(input.solutionA, input.bytes, input.demand),
     laneB = solutionStory(input.solutionB, input.bytes, input.demand);
   const stories: Record<Area, SpatialStory> = {
@@ -287,11 +288,16 @@ export function buildAtlas(input: Inputs): SpatialStory {
       readout:
         input.area === "transaction" && index === 2
           ? [
-              ["PEERS", `${input.network.nodes}`],
+              [
+                "REACHABLE",
+                `${delivery.reachable} / ${input.network.nodes - delivery.down.size}`,
+              ],
               ["WIRE BUDGET", `${input.network.payload} bytes`],
               [
                 "MODELED p95",
-                `${Math.round(simulateNetwork(input.network).p95)} ms`,
+                delivery.reachable < input.network.nodes - delivery.down.size
+                  ? "UNREACHABLE"
+                  : `${Math.round(delivery.p95)} ms`,
               ],
             ]
           : chapter.readout,

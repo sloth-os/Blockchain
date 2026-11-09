@@ -72,7 +72,9 @@ describe("a connected blockchain world", () => {
         expect(world.chapters[2].focus).toEqual(areas.network.focus);
         expect(world.chapters[2].readout).toContainEqual([
           "MODELED p95",
-          `${Math.round(sim.p95)} ms`,
+          sim.reachable < network.nodes - sim.down.size
+            ? "UNREACHABLE"
+            : `${Math.round(sim.p95)} ms`,
         ]);
       }
     }

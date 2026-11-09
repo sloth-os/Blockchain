@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -48,6 +48,41 @@ export default function Workspace() {
   const introRef = useRef<HTMLDivElement>(null);
   const [stageHeight, setStageHeight] = useState(600);
   const [introSize, setIntroSize] = useState({ width: 350, height: 170 });
+  useLayoutEffect(() => {
+    const intro = introRef.current;
+    if (!intro) return;
+    const next = {
+      width: intro.offsetLeft + intro.offsetWidth + 12,
+      height: intro.offsetTop + intro.offsetHeight + 12,
+    };
+    if (next.width !== introSize.width || next.height !== introSize.height)
+      setIntroSize(next);
+  });
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraRef = useRef<HTMLDivElement>(null);
+  const cameraTrigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (c.panel || c.overlay) setCameraOpen(false);
+  }, [c.panel, c.overlay]);
+  useEffect(() => {
+    if (!cameraOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (!cameraRef.current?.contains(event.target as Node))
+        setCameraOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setCameraOpen(false);
+        cameraTrigger.current?.focus();
+      }
+    };
+    window.addEventListener("pointerdown", outside);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("pointerdown", outside);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [cameraOpen]);
   useEffect(() => {
     const observer = new ResizeObserver(([entry]) =>
       setStageHeight(entry.contentRect.height),
@@ -91,7 +126,10 @@ export default function Workspace() {
             "REACHABLE",
             `${c.net.reachable} / ${c.network.nodes - c.net.down.size}`,
           ],
-          ["MODELED p95", `${Math.round(c.net.p95)} ms`],
+          [
+            "MODELED p95",
+            c.netDisconnected ? "UNREACHABLE" : `${Math.round(c.net.p95)} ms`,
+          ],
         ]
       : c.area === "scale"
         ? [
@@ -107,7 +145,7 @@ export default function Workspace() {
           ]
         : c.chapter.readout;
   const explanation = c.overview
-    ? "Choose a landmark in the world. Follow the same transaction into propagation, scaling, real uses, and the assumptions behind them."
+    ? "Select a glowing landmark, or start with a signed transaction."
     : c.area === "transaction"
       ? stages[c.step].body
       : c.area === "network"
@@ -126,6 +164,21 @@ export default function Workspace() {
           ? c.world.chapters.map((s) => s.title)
           : [];
   const canPlay = !c.overview && c.area !== "scale";
+  const shortConnection = c.overview
+    ? "Start a transaction"
+    : c.area === "transaction"
+      ? c.step >= 6
+        ? "Real-world uses"
+        : c.step >= 4
+          ? "Scaling choices"
+          : "Peer network"
+      : c.area === "network"
+        ? "Validation"
+        : c.area === "scale"
+          ? "Real-world uses"
+          : c.area === "applications"
+            ? "Related issue"
+            : "New transaction";
   return (
     <main
       className={`atlas-workspace ${c.motion ? "" : "motion-paused"} ${c.panel ? "workbench-open" : ""}`}
@@ -172,13 +225,15 @@ export default function Workspace() {
           <button
             className={`atlas-map-trigger ${c.overview ? "active" : ""}`}
             aria-label="Explore the connected atlas"
+            title="Explore all five connected areas"
             onClick={c.showAtlas}
           >
             <Compass size={15} />
-            <span>Atlas</span>
+            <span>Explore</span>
           </button>
           <button
             aria-label="Search the atlas"
+            title="Search concepts, applications and issues (Ctrl/⌘ K)"
             onClick={() => c.setOverlay("search")}
           >
             <Search size={16} />
@@ -186,12 +241,18 @@ export default function Workspace() {
           </button>
           <button
             aria-label={c.motion ? "Pause all motion" : "Enable motion"}
+            title={
+              c.motion
+                ? "Pause all motion"
+                : "Enable motion · manual exploration is always available"
+            }
             onClick={c.toggleMotion}
           >
             {c.motion ? <Pause size={15} /> : <Play size={15} />}
           </button>
           <button
             aria-label="Research and sources"
+            title="Research and sources"
             onClick={() => c.setOverlay("sources")}
           >
             <BookOpen size={16} />
@@ -199,6 +260,7 @@ export default function Workspace() {
           <button
             className="atlas-help"
             aria-label="How to explore this world"
+            title="How to explore this world"
             onClick={() => c.setOverlay("help")}
           >
             <HelpCircle size={16} />
@@ -235,7 +297,18 @@ export default function Workspace() {
           offline={c.net.down}
           arrivals={c.net.times}
           progress={c.sceneProgress}
-          safeInsets={{ ...safeInsets, intro: introSize }}
+          safeInsets={{
+            ...safeInsets,
+            intro: introSize,
+            labelBottom:
+              stageHeight < 320
+                ? 64
+                : c.overview
+                  ? 80
+                  : c.area === "transaction"
+                    ? 166
+                    : 120,
+          }}
         />
         <div ref={introRef} className="atlas-focus-intro">
           <div className="atlas-eyebrow">
@@ -262,6 +335,7 @@ export default function Workspace() {
             {!c.overview && (
               <button
                 className={c.panel === "tools" ? "active" : ""}
+                aria-expanded={c.panel === "tools"}
                 aria-label="Open experiment controls"
                 onClick={() => c.setPanel(c.panel === "tools" ? null : "tools")}
               >
@@ -272,6 +346,7 @@ export default function Workspace() {
             {!c.overview && (
               <button
                 aria-label="Explain this connection"
+                aria-expanded={c.panel === "notes"}
                 onClick={() => c.setPanel(c.panel === "notes" ? null : "notes")}
               >
                 <BookOpen size={12} />
@@ -282,6 +357,7 @@ export default function Workspace() {
         </div>
         <div
           className="atlas-lenses"
+          inert={Boolean(c.panel && c.mobile)}
           role="group"
           aria-label="Information lens"
         >
@@ -312,6 +388,7 @@ export default function Workspace() {
         {!c.overview && c.area === "transaction" && (
           <div
             className={`atlas-auth-status ${c.tampered ? "invalid" : ""}`}
+            inert={Boolean(c.panel && c.mobile)}
             role="status"
           >
             {c.valid === true ? (
@@ -333,8 +410,13 @@ export default function Workspace() {
                       : "Received bytes fail authorization"}
             </span>
             {c.tx && (
-              <button onClick={c.toggleTamper}>
-                {c.tampered ? "Restore signed bytes" : "Alter signed amount"}
+              <button
+                aria-label={
+                  c.tampered ? "Restore signed bytes" : "Alter signed amount"
+                }
+                onClick={c.toggleTamper}
+              >
+                {c.tampered ? "Restore" : "Tamper"}
                 <ArrowRight size={10} />
               </button>
             )}
@@ -369,52 +451,83 @@ export default function Workspace() {
           </div>
         )}
         <div
+          ref={cameraRef}
           className="atlas-camera-dock"
+          inert={Boolean(c.panel && c.mobile)}
+          data-camera-open={cameraOpen}
           role="group"
           aria-label="Camera views"
         >
-          <span>CAMERA</span>
           <button
-            aria-label="Follow the active process"
-            className={c.view === "follow" && !c.overview ? "active" : ""}
-            onClick={() => {
-              c.setView("follow");
-              c.setResetKey((v) => v + 1);
-            }}
-            disabled={c.overview}
+            ref={cameraTrigger}
+            className="camera-menu-trigger"
+            aria-label="Choose camera view"
+            aria-expanded={cameraOpen}
+            aria-controls="camera-options"
+            onClick={() => setCameraOpen(!cameraOpen)}
           >
-            <Focus size={12} />
-            <span>Follow</span>
+            <Focus size={15} />
+            Camera
+            <ChevronDown size={12} />
           </button>
-          <button
-            aria-label="Frame the current connection"
-            className={c.view === "map" && !c.overview ? "active" : ""}
-            onClick={() => {
-              c.setView("map");
-              c.setResetKey((v) => v + 1);
-            }}
-            disabled={c.overview}
-          >
-            <Map size={12} />
-            <span>Frame</span>
-          </button>
-          <button
-            aria-label="View from above"
-            className={c.view === "top" ? "active" : ""}
-            onClick={() => c.setView("top")}
-          >
-            <Layers3 size={12} />
-            <span>Above</span>
-          </button>
+          <div className="camera-options" id="camera-options">
+            <span>CAMERA</span>
+            <button
+              aria-label="Follow the active process"
+              aria-pressed={c.view === "follow" && !c.overview}
+              className={c.view === "follow" && !c.overview ? "active" : ""}
+              onClick={() => {
+                c.setView("follow");
+                setCameraOpen(false);
+                cameraTrigger.current?.focus({ preventScroll: true });
+                c.setResetKey((v) => v + 1);
+              }}
+              disabled={c.overview}
+            >
+              <Focus size={12} />
+              <span>Follow</span>
+            </button>
+            <button
+              aria-label="Frame the current connection"
+              aria-pressed={c.view === "map" && !c.overview}
+              className={c.view === "map" && !c.overview ? "active" : ""}
+              onClick={() => {
+                c.setView("map");
+                setCameraOpen(false);
+                cameraTrigger.current?.focus({ preventScroll: true });
+                c.setResetKey((v) => v + 1);
+              }}
+              disabled={c.overview}
+            >
+              <Map size={12} />
+              <span>Frame</span>
+            </button>
+            <button
+              aria-label="View from above"
+              aria-pressed={c.view === "top"}
+              className={c.view === "top" ? "active" : ""}
+              onClick={() => {
+                c.setView("top");
+                setCameraOpen(false);
+                cameraTrigger.current?.focus({ preventScroll: true });
+              }}
+            >
+              <Layers3 size={12} />
+              <span>Above</span>
+            </button>
+          </div>
         </div>
-        <div className="atlas-world-caption">
-          <span>LOCAL SIMULATION</span>
-          <span>No wallet · no real funds</span>
+        <div
+          className="atlas-world-caption"
+          inert={Boolean(c.panel && c.mobile)}
+        >
+          <span>LOCAL MODEL</span>
+          <span>No real funds</span>
           <button
             aria-label="Open model assumptions"
             onClick={() => c.setPanel("notes")}
           >
-            Models ≠ live benchmarks
+            Model notes
           </button>
         </div>
         {c.panel && <Workbench c={c} />}
@@ -438,13 +551,9 @@ export default function Workspace() {
           <div className="narration-copy">
             <h2>
               {c.overview
-                ? "Every part belongs to the same story"
+                ? "Choose a connection"
                 : c.area === "network"
-                  ? c.netSent
-                    ? c.netRun
-                      ? "Message propagating"
-                      : "Broadcast complete"
-                    : "Ready to broadcast"
+                  ? c.networkTitle
                   : c.area === "scale"
                     ? "Which constraint is doing the limiting?"
                     : c.chapter.title}
@@ -452,8 +561,8 @@ export default function Workspace() {
             <p>{explanation}</p>
           </div>
           <div className="atlas-live-readouts">
-            {readouts.slice(0, 3).map(([label, value]) => (
-              <div key={label}>
+            {readouts.slice(0, 3).map(([label, value], index) => (
+              <div key={index}>
                 <span>{label}</span>
                 <strong>{value}</strong>
               </div>
@@ -468,10 +577,27 @@ export default function Workspace() {
                 aria-label={
                   c.running && c.motion
                     ? "Pause current process"
-                    : "Play current process"
+                    : !c.motion
+                      ? "Enable motion and play"
+                      : "Play current process"
                 }
-                disabled={!c.motion}
-                onClick={c.togglePlay}
+                title={
+                  c.running && c.motion
+                    ? "Pause the current process"
+                    : !c.motion
+                      ? "Enable motion and play · phases also work without motion"
+                      : "Play the current process"
+                }
+                disabled={
+                  c.area === "transaction" &&
+                  (!c.amountValid || (!c.tx && !c.cryptoError))
+                }
+                onClick={() => {
+                  if (!c.motion) {
+                    c.toggleMotion();
+                    if (!c.running) c.togglePlay();
+                  } else c.togglePlay();
+                }}
               >
                 {c.running && c.motion ? (
                   <Pause size={16} />
@@ -480,7 +606,7 @@ export default function Workspace() {
                 )}
               </button>
             )}
-            {!c.overview && (
+            {!c.overview && c.area !== "scale" && (
               <button
                 className="transport-reset"
                 aria-label="Restart current process"
@@ -530,7 +656,7 @@ export default function Workspace() {
                     c.setSelectedId(null);
                     c.jumpTx(
                       Math.min(
-                        c.tampered ? 3.999 : 6.999,
+                        c.maxTxStep + 0.999,
                         (Number(e.target.value) / 1000) * 7,
                       ),
                     );
@@ -542,7 +668,7 @@ export default function Workspace() {
                       key={title}
                       aria-label={`Explore ${title} phase`}
                       aria-current={c.step === i ? "step" : undefined}
-                      disabled={c.tampered && i > 3}
+                      disabled={i > c.maxTxStep}
                       onClick={() => c.jump(i)}
                     >
                       <i />
@@ -562,7 +688,7 @@ export default function Workspace() {
                 </div>
                 <p>
                   {Math.round(c.netElapsed)} / {Math.round(c.net.total)} model
-                  ms<span>Animation slowed 4×</span>
+                  ms<span>Animation slowed {4 / c.speed}×</span>
                 </p>
               </div>
             ) : c.area === "scale" ? (
@@ -586,14 +712,60 @@ export default function Workspace() {
                 ))}
               </div>
             )}
+            {phaseTitles.length > 0 && !c.overview && (
+              <div className="phase-mobile-navigation">
+                <button
+                  aria-label="Previous process step"
+                  disabled={c.step === 0}
+                  onClick={() => c.jump(c.step - 1)}
+                >
+                  <ArrowLeft size={17} />
+                </button>
+                <select
+                  aria-label="Process phase"
+                  value={c.step}
+                  onChange={(event) => c.jump(Number(event.target.value))}
+                >
+                  {phaseTitles.map((title, index) => (
+                    <option
+                      value={index}
+                      key={title}
+                      disabled={c.area === "transaction" && index > c.maxTxStep}
+                    >
+                      {index + 1} / {phaseTitles.length} · {title}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  aria-label="Next process step"
+                  disabled={
+                    c.step >=
+                    (c.area === "transaction"
+                      ? c.maxTxStep
+                      : phaseTitles.length - 1)
+                  }
+                  onClick={() => c.jump(c.step + 1)}
+                >
+                  <ArrowRight size={17} />
+                </button>
+              </div>
+            )}
           </div>
           <button
             className="next-connection"
+            aria-label={
+              c.overview ? "Start with one transaction" : c.connectionLabel
+            }
             onClick={() =>
               c.overview ? c.focus("transaction") : c.connection()
             }
           >
-            {c.overview ? "Start with one transaction" : c.connectionLabel}
+            <span className="connection-label-full">
+              {c.overview ? "Start with one transaction" : c.connectionLabel}
+            </span>
+            <span className="connection-label-short">
+              Next: {shortConnection}
+            </span>
             <ArrowRight size={15} />
           </button>
         </div>
@@ -657,6 +829,22 @@ export default function Workspace() {
 
 function Workbench({ c }: { c: AtlasController }) {
   const focusRef = useRef<HTMLElement>(null);
+  const returnFocus = useRef(document.activeElement);
+  useEffect(() => {
+    focusRef.current?.focus({ preventScroll: true });
+  }, [c.panel, c.area, c.selectedId]);
+  useEffect(
+    () => () => {
+      const previous = returnFocus.current;
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus({ preventScroll: true });
+      else
+        document
+          .querySelector<HTMLButtonElement>(".atlas-context-actions button")
+          ?.focus({ preventScroll: true });
+    },
+    [],
+  );
   const title =
     c.panel === "inspect"
       ? "Object inspector"
@@ -791,17 +979,26 @@ function Tools({ c }: { c: AtlasController }) {
           Amount · fictional ATLAS
           <input
             aria-label="Transaction amount"
+            aria-invalid={!c.amountValid}
+            aria-describedby={
+              !c.amountValid ? "transaction-amount-error" : undefined
+            }
             type="number"
             min=".01"
             max="1000"
-            step=".1"
+            step="any"
             value={c.amount}
             onChange={(e) => c.setAmount(e.target.value)}
           />
         </label>
         {!c.amountValid && (
-          <p className="inline-error" role="alert">
-            Enter an amount greater than zero and no more than 1,000.
+          <p
+            className="inline-error"
+            id="transaction-amount-error"
+            role="alert"
+          >
+            Enter an amount from 0.01 to 1,000. Later phases wait for a valid
+            signed message.
           </p>
         )}
         {c.cryptoError && (
@@ -934,6 +1131,7 @@ function Tools({ c }: { c: AtlasController }) {
           max={8192}
           step={1}
           onChange={(payload) => c.updateNetwork({ payload })}
+          hint={`Minimum ${c.wireBytes} bytes: this draft, signature and public key. Larger budgets model extra data. Shared with the scaling comparison.`}
         />
         <Range
           label="Offline nodes"

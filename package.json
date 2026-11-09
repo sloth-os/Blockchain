@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "review:ui": "node scripts/review-ui.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
